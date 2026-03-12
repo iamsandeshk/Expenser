@@ -1,0 +1,435 @@
+import { useState } from 'react';
+import { Wallet, Users, BookmarkPlus, BarChart3, ChevronRight, ChevronLeft, Sun, Moon, Monitor, Check, Plus, Home, User, ExternalLink, Settings, Tag, ArrowDownRight, ArrowUpRight, Folder, Pin } from 'lucide-react';
+import { CURRENCIES, setCurrency, setOnboardingDone, type CurrencyInfo } from '@/lib/storage';
+import { setStoredTheme, type ThemeMode } from '@/lib/theme';
+
+interface OnboardingProps {
+  onComplete: () => void;
+}
+
+/* ── Mini UI Preview Components ── */
+
+function DashboardPreview() {
+  return (
+    <div className="w-full max-w-[280px] mx-auto space-y-2.5">
+      {/* Balance card */}
+      <div className="rounded-2xl p-4 text-left"
+        style={{ background: 'hsl(var(--primary) / 0.08)', border: '1px solid hsl(var(--primary) / 0.12)' }}>
+        <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-widest">Net Balance</p>
+        <p className="text-2xl font-extrabold mt-1" style={{ color: 'hsl(var(--success))' }}>+₹2,450</p>
+        <div className="flex gap-2 mt-2.5">
+          <div className="flex-1 rounded-lg px-2.5 py-1.5" style={{ background: 'hsl(var(--success) / 0.1)' }}>
+            <p className="text-[8px] text-muted-foreground">Incoming</p>
+            <p className="text-[11px] font-bold" style={{ color: 'hsl(var(--success))' }}>₹3,200</p>
+          </div>
+          <div className="flex-1 rounded-lg px-2.5 py-1.5" style={{ background: 'hsl(var(--danger) / 0.1)' }}>
+            <p className="text-[8px] text-muted-foreground">Outgoing</p>
+            <p className="text-[11px] font-bold" style={{ color: 'hsl(var(--danger))' }}>₹750</p>
+          </div>
+        </div>
+      </div>
+      {/* Quick actions */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-xl py-2.5 px-3 flex items-center gap-2"
+          style={{ background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)))', color: 'white' }}>
+          <Plus size={12} /> <span className="text-[10px] font-bold">Personal</span>
+        </div>
+        <div className="rounded-xl py-2.5 px-3 flex items-center gap-2"
+          style={{ background: 'hsl(var(--card) / 0.9)', border: '1px solid hsl(var(--border) / 0.3)' }}>
+          <Users size={12} className="text-primary" /> <span className="text-[10px] font-semibold">Shared</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PersonalPreview() {
+  const items = [
+    { emoji: '🍕', name: 'Pizza Night', amount: '₹450', cat: 'Food & Dining' },
+    { emoji: '🚗', name: 'Uber Ride', amount: '₹180', cat: 'Transportation' },
+    { emoji: '🛍️', name: 'New Shoes', amount: '₹2,200', cat: 'Shopping' },
+  ];
+  return (
+    <div className="w-full max-w-[280px] mx-auto space-y-2">
+      {items.map((item, i) => (
+        <div key={i} className="flex items-center gap-3 rounded-2xl px-3.5 py-2.5"
+          style={{ background: 'hsl(var(--card) / 0.8)', border: '1px solid hsl(var(--border) / 0.2)' }}>
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg"
+            style={{ background: 'hsl(var(--secondary) / 0.6)' }}>
+            {item.emoji}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] font-semibold truncate">{item.name}</p>
+            <p className="text-[9px] text-muted-foreground">{item.cat}</p>
+          </div>
+          <p className="text-[11px] font-bold">{item.amount}</p>
+        </div>
+      ))}
+      {/* Add button hint */}
+      <div className="flex justify-center pt-1">
+        <div className="w-10 h-10 rounded-full flex items-center justify-center"
+          style={{ background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)))', boxShadow: '0 4px 16px -4px hsl(var(--primary) / 0.5)' }}>
+          <Plus size={16} color="white" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SharedPreview() {
+  const people = [
+    { name: 'Ajay', initial: 'A', amount: '+₹1,200', positive: true },
+    { name: 'Priya', initial: 'P', amount: '-₹800', positive: false },
+  ];
+  return (
+    <div className="w-full max-w-[280px] mx-auto space-y-2">
+      {people.map((p, i) => (
+        <div key={i} className="flex items-center gap-3 rounded-2xl px-3.5 py-2.5"
+          style={{ background: 'hsl(var(--card) / 0.8)', border: '1px solid hsl(var(--border) / 0.2)' }}>
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold"
+            style={{
+              background: p.positive ? 'hsl(var(--success) / 0.12)' : 'hsl(var(--danger) / 0.12)',
+              color: p.positive ? 'hsl(var(--success))' : 'hsl(var(--danger))',
+            }}>
+            {p.initial}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] font-semibold">{p.name}</p>
+            <p className="text-[9px] text-muted-foreground">{p.positive ? 'Owes you' : 'You owe'}</p>
+          </div>
+          <p className="text-[11px] font-bold" style={{ color: p.positive ? 'hsl(var(--success))' : 'hsl(var(--danger))' }}>
+            {p.amount}
+          </p>
+          <div className="text-[8px] px-2 py-1 rounded-lg font-bold"
+            style={{ background: 'hsl(var(--primary) / 0.12)', color: 'hsl(var(--primary))' }}>
+            Settle
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LinksPreview() {
+  const links = [
+    { name: 'Twitter', domain: 'twitter.com', icon: '𝕏' },
+    { name: 'GitHub', domain: 'github.com', icon: '🐙' },
+  ];
+  return (
+    <div className="w-full max-w-[280px] mx-auto space-y-2">
+      {/* Group */}
+      <div className="rounded-2xl p-3 flex items-center gap-3"
+        style={{ background: 'hsl(var(--card) / 0.8)', border: '1px solid hsl(var(--border) / 0.2)' }}>
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+          style={{ background: 'hsl(210, 100%, 55% / 0.15)' }}>
+          <Folder size={15} style={{ color: 'hsl(210, 100%, 55%)' }} />
+        </div>
+        <div className="flex-1">
+          <p className="text-[11px] font-semibold">Work Tools</p>
+          <p className="text-[9px] text-muted-foreground">3 links</p>
+        </div>
+        <Pin size={9} className="text-primary" />
+      </div>
+      {/* Links */}
+      {links.map((l, i) => (
+        <div key={i} className="flex items-center gap-3 rounded-2xl px-3.5 py-2.5"
+          style={{ background: 'hsl(var(--card) / 0.8)', border: '1px solid hsl(var(--border) / 0.2)' }}>
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm"
+            style={{ background: 'hsl(var(--secondary) / 0.6)' }}>
+            {l.icon}
+          </div>
+          <div className="flex-1">
+            <p className="text-[11px] font-semibold">{l.name}</p>
+            <p className="text-[9px] text-muted-foreground">{l.domain}</p>
+          </div>
+          <ExternalLink size={12} className="text-muted-foreground/40" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const STEPS = [
+  {
+    icon: Wallet,
+    color: 'hsl(var(--primary))',
+    title: 'Welcome to SplitMate',
+    subtitle: 'Your simple expense tracker',
+    description: 'Track personal spending, split bills with friends, and save your favourite links — all in one place.',
+    preview: DashboardPreview,
+  },
+  {
+    icon: BarChart3,
+    color: 'hsl(211, 100%, 58%)',
+    title: 'Personal Expenses',
+    subtitle: 'Know where your money goes',
+    description: 'Add expenses, categorise them, and see beautiful charts of your spending patterns.',
+    preview: PersonalPreview,
+  },
+  {
+    icon: Users,
+    color: 'hsl(270, 50%, 60%)',
+    title: 'Split with Friends',
+    subtitle: 'Never lose track of who owes what',
+    description: 'Record shared expenses, track balances with each person, and settle up when ready.',
+    preview: SharedPreview,
+  },
+  {
+    icon: BookmarkPlus,
+    color: 'hsl(var(--success))',
+    title: 'Save Links',
+    subtitle: 'Your personal bookmark manager',
+    description: 'Save websites, organise them into groups, and access them anytime.',
+    preview: LinksPreview,
+  },
+];
+
+export function Onboarding({ onComplete }: OnboardingProps) {
+  const [step, setStep] = useState(0);
+  const [selectedTheme, setSelectedTheme] = useState<ThemeMode>('system');
+  const [selectedCurrency, setSelectedCurrency] = useState<string>('INR');
+
+  const isFeatureStep = step < STEPS.length;
+  const isThemeStep = step === STEPS.length;
+  const isCurrencyStep = step === STEPS.length + 1;
+  const totalSteps = STEPS.length + 2;
+
+  const handleNext = () => {
+    if (step < totalSteps - 1) {
+      setStep(step + 1);
+    }
+  };
+
+  const handleBack = () => {
+    if (step > 0) setStep(step - 1);
+  };
+
+  const handleFinish = () => {
+    setStoredTheme(selectedTheme);
+    setCurrency(selectedCurrency);
+    setOnboardingDone();
+    onComplete();
+  };
+
+  const handleThemeSelect = (mode: ThemeMode) => {
+    setSelectedTheme(mode);
+    setStoredTheme(mode);
+  };
+
+  const themes: { id: ThemeMode; label: string; icon: typeof Sun; desc: string }[] = [
+    { id: 'light', label: 'Light', icon: Sun, desc: 'Clean & bright' },
+    { id: 'dark', label: 'Dark', icon: Moon, desc: 'Easy on the eyes' },
+    { id: 'system', label: 'System', icon: Monitor, desc: 'Match your device' },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-[9999] bg-background flex flex-col">
+      {/* Progress dots */}
+      <div className="flex justify-center gap-1.5 pt-12 pb-4">
+        {Array.from({ length: totalSteps }).map((_, i) => (
+          <div
+            key={i}
+            className="h-1 rounded-full transition-all duration-400"
+            style={{
+              width: i === step ? '24px' : '6px',
+              background: i === step
+                ? 'hsl(var(--primary))'
+                : i < step
+                  ? 'hsl(var(--primary) / 0.4)'
+                  : 'hsl(var(--border) / 0.5)',
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 flex flex-col items-center justify-center px-8 overflow-y-auto">
+        {isFeatureStep && (() => {
+          const s = STEPS[step];
+          const Icon = s.icon;
+          const Preview = s.preview;
+          return (
+            <div className="flex flex-col items-center text-center max-w-sm w-full">
+              {/* Title + subtitle */}
+              <div className="mb-5">
+                <h1 className="text-2xl font-extrabold mb-1.5">{s.title}</h1>
+                <p className="text-sm font-semibold text-primary">{s.subtitle}</p>
+              </div>
+
+              {/* Mini UI preview */}
+              <div className="w-full mb-5">
+                <Preview />
+              </div>
+
+              <p className="text-xs text-muted-foreground leading-relaxed max-w-[260px]">
+                {s.description}
+              </p>
+            </div>
+          );
+        })()}
+
+        {isThemeStep && (
+          <div className="flex flex-col items-center text-center max-w-sm w-full">
+            <div className="relative mb-8">
+              <div
+                className="w-24 h-24 rounded-[2rem] flex items-center justify-center"
+                style={{
+                  background: 'linear-gradient(135deg, hsl(var(--foreground) / 0.1), hsl(var(--foreground) / 0.05))',
+                  border: '1px solid hsl(var(--border) / 0.3)',
+                }}
+              >
+                {selectedTheme === 'light' ? <Sun size={40} className="text-foreground" /> :
+                 selectedTheme === 'dark' ? <Moon size={40} className="text-foreground" /> :
+                 <Monitor size={40} className="text-foreground" />}
+              </div>
+            </div>
+
+            <h1 className="text-2xl font-extrabold mb-2">Choose your look</h1>
+            <p className="text-sm text-muted-foreground mb-8">Pick a theme that feels right</p>
+
+            <div className="w-full space-y-3">
+              {themes.map((t) => {
+                const TIcon = t.icon;
+                const active = selectedTheme === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => handleThemeSelect(t.id)}
+                    className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-left transition-all duration-200"
+                    style={{
+                      background: active ? 'hsl(var(--primary) / 0.1)' : 'hsl(var(--card) / 0.7)',
+                      border: `1.5px solid ${active ? 'hsl(var(--primary) / 0.4)' : 'hsl(var(--border) / 0.25)'}`,
+                    }}
+                  >
+                    <div
+                      className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{
+                        background: active ? 'hsl(var(--primary) / 0.15)' : 'hsl(var(--secondary) / 0.6)',
+                      }}
+                    >
+                      <TIcon size={18} className={active ? 'text-primary' : 'text-muted-foreground'} />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-sm">{t.label}</p>
+                      <p className="text-[11px] text-muted-foreground">{t.desc}</p>
+                    </div>
+                    {active && (
+                      <div className="w-6 h-6 rounded-full flex items-center justify-center"
+                        style={{ background: 'hsl(var(--primary))' }}>
+                        <Check size={14} color="white" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {isCurrencyStep && (
+          <div className="flex flex-col items-center text-center max-w-sm w-full">
+            <div className="relative mb-8">
+              <div
+                className="w-24 h-24 rounded-[2rem] flex items-center justify-center"
+                style={{
+                  background: 'linear-gradient(135deg, hsl(var(--success) / 0.15), hsl(var(--success) / 0.05))',
+                  border: '1px solid hsl(var(--success) / 0.2)',
+                }}
+              >
+                <span className="text-4xl font-bold" style={{ color: 'hsl(var(--success))' }}>
+                  {CURRENCIES.find(c => c.code === selectedCurrency)?.symbol || '₹'}
+                </span>
+              </div>
+            </div>
+
+            <h1 className="text-2xl font-extrabold mb-2">Your currency</h1>
+            <p className="text-sm text-muted-foreground mb-6">Choose your primary currency</p>
+
+            <div className="w-full relative">
+            <div className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none z-10" style={{ background: 'linear-gradient(to bottom, transparent, hsl(var(--background)))' }} />
+            <div className="grid grid-cols-2 gap-2.5 max-h-[320px] overflow-y-auto pb-8">
+              {CURRENCIES.map((cur) => {
+                const active = selectedCurrency === cur.code;
+                return (
+                  <button
+                    key={cur.code}
+                    onClick={() => setSelectedCurrency(cur.code)}
+                    className="flex items-center gap-3 px-4 py-3.5 rounded-2xl text-left transition-all duration-200"
+                    style={{
+                      background: active ? 'hsl(var(--primary) / 0.1)' : 'hsl(var(--card) / 0.7)',
+                      border: `1.5px solid ${active ? 'hsl(var(--primary) / 0.4)' : 'hsl(var(--border) / 0.25)'}`,
+                    }}
+                  >
+                    <span className="text-lg font-bold flex-shrink-0 w-7 text-center"
+                      style={{ color: active ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))' }}>
+                      {cur.symbol}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-xs">{cur.code}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">{cur.name}</p>
+                    </div>
+                    {active && (
+                      <Check size={14} className="text-primary flex-shrink-0" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom actions */}
+      <div className="flex-shrink-0 px-6 pb-10 pt-4">
+        <div className="flex items-center gap-3 max-w-sm mx-auto w-full">
+          {step > 0 && (
+            <button
+              onClick={handleBack}
+              className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
+              style={{
+                background: 'hsl(var(--secondary))',
+                border: '1px solid hsl(var(--border) / 0.3)',
+              }}
+            >
+              <ChevronLeft size={18} className="text-muted-foreground" />
+            </button>
+          )}
+          {isCurrencyStep ? (
+            <button
+              onClick={handleFinish}
+              className="flex-1 h-14 rounded-2xl font-bold text-sm flex items-center justify-center gap-2"
+              style={{
+                background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)))',
+                color: 'white',
+                boxShadow: '0 8px 24px -6px hsl(var(--primary) / 0.5)',
+              }}
+            >
+              Get Started <ChevronRight size={16} />
+            </button>
+          ) : (
+            <button
+              onClick={handleNext}
+              className="flex-1 h-14 rounded-2xl font-bold text-sm flex items-center justify-center gap-2"
+              style={{
+                background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)))',
+                color: 'white',
+                boxShadow: '0 8px 24px -6px hsl(var(--primary) / 0.5)',
+              }}
+            >
+              {step === 0 ? "Let's Go" : 'Continue'} <ChevronRight size={16} />
+            </button>
+          )}
+        </div>
+        {isFeatureStep && step < STEPS.length - 1 && (
+          <button
+            onClick={() => setStep(STEPS.length)}
+            className="block mx-auto mt-3 text-xs text-muted-foreground font-medium"
+          >
+            Skip intro
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
