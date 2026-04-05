@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Expense Tracker</string>
+    <string name="title_activity_main">Expense Tracker</string>
+    <string name="package_name">com.expensetrack1ux.dev</string>
+    <string name="custom_url_scheme">com.expensetrack1ux.dev</string>
+    <string name="default_web_client_id">480038500173-dn6fprr6u4ot65ml8cshjtn1sqdq75i9.apps.googleusercontent.com</string>
+</resources>

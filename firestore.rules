@@ -1,0 +1,46 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ✅ Personal cloud backup — only owner can read/write their own backup
+    match /users/{uid}/backups/{docId} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ✅ Pro premium record — owner only
+    match /premium/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ✅ Legacy Pro subscription record — owner only
+    match /users/{uid}/subscription/{docId} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ✅ P2P Sync inbox — anyone authenticated can write to any inbox
+    // (sender pushes to receiver's slot using their email as the target key)
+    // Only the targeted email can read; anyone authenticated can write (to deliver updates)
+    match /sync_inbox/{docId} {
+      allow read: if request.auth != null
+                  && request.auth.token.email != null
+                  && resource.data.targetEmail == request.auth.token.email;
+      allow write: if request.auth != null;
+      allow delete: if request.auth != null
+                    && request.auth.token.email != null
+                    && resource.data.targetEmail == request.auth.token.email;
+    }
+
+    // ✅ P2P Sync group — same rules as inbox but for group updates
+    match /sync_group/{docId} {
+      allow read: if request.auth != null
+                  && request.auth.token.email != null
+                  && resource.data.targetEmail == request.auth.token.email;
+      allow write: if request.auth != null;
+      allow delete: if request.auth != null
+                    && request.auth.token.email != null
+                    && resource.data.targetEmail == request.auth.token.email;
+    }
+
+  }
+}

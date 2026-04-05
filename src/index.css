@@ -1,0 +1,494 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* iOS 26 Liquid Glass Theme */
+    --background: 0 0% 4%;
+    --foreground: 0 0% 98%;
+
+    --card: 0 0% 9%;
+    --card-foreground: 0 0% 98%;
+    --card-glass: 0 0% 13%;
+
+    --popover: 0 0% 5%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 211 100% 58%;
+    --primary-glow: 211 100% 72%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 13%;
+    --secondary-foreground: 0 0% 90%;
+
+    --muted: 0 0% 11%;
+    --muted-foreground: 0 0% 62%;
+
+    --accent: 211 45% 22%;
+    --accent-foreground: 0 0% 95%;
+
+    --destructive: 0 85% 65%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 20%;
+    --input: 0 0% 13%;
+    --ring: 211 100% 58%;
+
+    /* Enhanced Money Colors */
+    --success: 149 88% 52%;
+    --success-glow: 149 100% 68%;
+    --success-foreground: 0 0% 100%;
+    --danger: 0 85% 65%;
+    --danger-glow: 0 100% 80%;
+    --danger-foreground: 0 0% 100%;
+    --warning: 45 90% 60%;
+    --warning-glow: 45 100% 75%;
+    --warning-foreground: 0 0% 100%;
+
+    /* Liquid Glass Values - simplified for performance */
+    --glass-bg: 0 0% 9% / 0.85;
+    --glass-border: 0 0% 100% / 0.08;
+    --glass-shadow: 0 0% 0% / 0.4;
+    
+    /* Typography */
+    --font-heading: 'SF Pro Display', 'Inter', system-ui, sans-serif;
+    --font-body: 'SF Pro Text', 'Inter', system-ui, sans-serif;
+
+    /* Enhanced Radius */
+    --radius: 1rem;
+    --radius-sm: 0.75rem;
+    --radius-lg: 1.5rem;
+    --radius-xl: 2rem;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .light {
+    --background: 0 0% 99%;
+    --foreground: 0 0% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 8%;
+    --card-glass: 0 0% 98%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 8%;
+    --primary: 211 100% 50%;
+    --primary-glow: 211 100% 65%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 8%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+    --accent: 211 30% 90%;
+    --accent-foreground: 0 0% 8%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 88%;
+    --input: 0 0% 94%;
+    --ring: 211 100% 50%;
+    --success: 149 90% 45%;
+    --success-glow: 149 100% 60%;
+    --danger: 0 84% 60%;
+    --danger-glow: 0 100% 75%;
+    --warning: 45 90% 50%;
+    --warning-glow: 45 100% 65%;
+    
+    --glass-bg: 255 100% 100% / 0.85;
+    --glass-border: 0 0% 0% / 0.08;
+    --glass-shadow: 0 0% 0% / 0.08;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    -moz-user-select: none;
+    -webkit-touch-callout: none; /* Disable callout on long-press (iOS) */
+  }
+
+  input, textarea, [contenteditable="true"], .selectable {
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Static gradient - no fixed attachment for performance */
+    background-image: 
+      radial-gradient(ellipse at 15% 40%, hsl(var(--primary) / 0.12) 0%, transparent 45%),
+      radial-gradient(ellipse at 85% 10%, hsl(var(--accent) / 0.10) 0%, transparent 45%),
+      radial-gradient(ellipse at 50% 90%, hsl(var(--success) / 0.07) 0%, transparent 40%);
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    background-attachment: scroll;
+  }
+
+  /* Liquid Glass Effects - optimized */
+  .liquid-glass {
+    background: hsl(var(--glass-bg));
+    backdrop-filter: blur(24px) saturate(1.5);
+    -webkit-backdrop-filter: blur(24px) saturate(1.5);
+    border: 1px solid hsl(var(--glass-border));
+    box-shadow: 
+      0 8px 32px -8px hsl(var(--glass-shadow)),
+      inset 0 1px 0 hsl(var(--glass-border));
+  }
+
+  .glass-card {
+    @apply liquid-glass rounded-[2.25rem];
+    position: relative;
+    overflow: hidden;
+  }
+
+  .glass-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--glass-border)),
+      transparent
+    );
+  }
+
+  /* Cards - no preserve-3d for performance */
+  .ios-card {
+    @apply liquid-glass rounded-[2.25rem] shadow-xl;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+  }
+
+  .ios-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 
+      0 20px 48px -12px hsl(var(--glass-shadow)),
+      0 0 0 1px hsl(var(--glass-border));
+  }
+
+  .money-positive {
+    @apply text-success;
+    filter: drop-shadow(0 0 6px hsl(var(--success-glow) / 0.25));
+  }
+
+  .money-negative {
+    @apply text-danger;
+    filter: drop-shadow(0 0 6px hsl(var(--danger-glow) / 0.25));
+  }
+
+  .money-neutral {
+    @apply text-muted-foreground;
+  }
+
+  /* Enhanced Typography */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer components {
+  /* Button System */
+  .btn-liquid {
+    @apply inline-flex items-center justify-center rounded-2xl px-6 py-3 text-sm font-semibold;
+    @apply transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/20;
+    backdrop-filter: blur(16px);
+    border: 1px solid hsl(var(--glass-border));
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-primary {
+    @apply btn-liquid bg-primary/90 text-primary-foreground;
+    @apply hover:bg-primary hover:scale-[1.03] active:scale-[0.97];
+    box-shadow: 
+      0 6px 20px -6px hsl(var(--primary) / 0.4),
+      inset 0 1px 0 hsl(var(--glass-border));
+  }
+
+  .btn-secondary {
+    @apply btn-liquid bg-secondary/90 text-secondary-foreground;
+    @apply hover:bg-secondary hover:scale-[1.03] active:scale-[0.97];
+  }
+
+  .btn-danger {
+    @apply btn-liquid bg-danger/90 text-danger-foreground;
+    @apply hover:bg-danger hover:scale-[1.03] active:scale-[0.97];
+    box-shadow: 
+      0 6px 20px -6px hsl(var(--danger) / 0.4),
+      inset 0 1px 0 hsl(var(--glass-border));
+  }
+
+  .btn-success {
+    @apply btn-liquid bg-success/90 text-success-foreground;
+    @apply hover:bg-success hover:scale-[1.03] active:scale-[0.97];
+    box-shadow: 
+      0 6px 20px -6px hsl(var(--success) / 0.4),
+      inset 0 1px 0 hsl(var(--glass-border));
+  }
+
+  /* Card Styles */
+  .card-liquid {
+    @apply liquid-glass rounded-[2.25rem] shadow-2xl;
+  }
+
+  .card-premium {
+    @apply card-liquid;
+    background: linear-gradient(
+      135deg,
+      hsl(var(--primary) / 0.08) 0%,
+      hsl(var(--card)) 50%,
+      hsl(var(--accent) / 0.08) 100%
+    );
+  }
+
+  /* Input Styles */
+  .input-liquid {
+    @apply flex h-14 w-full rounded-2xl px-4 py-3 text-sm;
+    @apply file:border-0 file:bg-transparent file:text-sm file:font-medium;
+    @apply placeholder:text-muted-foreground focus-visible:outline-none;
+    @apply focus-visible:ring-2 focus-visible:ring-primary/30;
+    @apply disabled:cursor-not-allowed disabled:opacity-50;
+    background: hsl(var(--glass-bg));
+    border: 1px solid hsl(var(--glass-border));
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  }
+
+  .input-liquid:focus {
+    background: hsl(var(--card));
+    border-color: hsl(var(--primary) / 0.4);
+    box-shadow: 
+      0 0 0 3px hsl(var(--primary) / 0.12),
+      0 4px 16px -4px hsl(var(--glass-shadow));
+  }
+
+  /* Modern Card Variant - no preserve-3d */
+  .ios-card-modern {
+    background: hsl(var(--card) / 0.9);
+    border: 1px solid hsl(var(--border) / 0.5);
+    border-radius: 2.25rem;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 
+      0 2px 16px -4px hsl(var(--glass-shadow) / 0.5),
+      inset 0 1px 0 hsl(var(--glass-border));
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+
+  .ios-card-modern:hover {
+    transform: translateY(-2px);
+    border-color: hsl(var(--border) / 0.8);
+    box-shadow: 
+      0 8px 28px -6px hsl(var(--glass-shadow) / 0.6),
+      inset 0 1px 0 hsl(var(--glass-border));
+  }
+
+  /* Card used in settings */
+  .card-ios {
+    background: hsl(var(--card) / 0.9);
+    border: 1px solid hsl(var(--border) / 0.5);
+    border-radius: 2.25rem;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 2px 16px -4px hsl(var(--glass-shadow) / 0.5);
+  }
+
+  .ios-button {
+    @apply px-6 py-3 rounded-2xl font-semibold transition-all duration-200;
+    @apply hover:scale-[1.04] active:scale-[0.96];
+    backdrop-filter: blur(16px);
+    border: 1px solid hsl(var(--glass-border));
+  }
+
+  .ios-button-primary {
+    @apply ios-button bg-primary text-primary-foreground;
+    box-shadow: 
+      0 6px 20px -6px hsl(var(--primary) / 0.4),
+      inset 0 1px 0 hsl(var(--glass-border));
+  }
+
+  .ios-button-primary:hover {
+    background: hsl(var(--primary-glow));
+  }
+
+  .ios-button-secondary {
+    @apply ios-button bg-secondary/80 text-secondary-foreground;
+    @apply hover:bg-secondary;
+  }
+
+  .settled-indicator {
+    @apply flex items-center justify-center w-10 h-10 rounded-2xl;
+    @apply transition-all duration-200 hover:scale-110;
+    background: hsl(var(--success) / 0.15);
+    border: 1px solid hsl(var(--success) / 0.25);
+  }
+
+  /* Enhanced FAB */
+  .fab-container {
+    position: fixed;
+    bottom: 110px;
+    right: 16px;
+    z-index: 40;
+    pointer-events: none;
+  }
+
+  .fab-button {
+    @apply w-14 h-14 rounded-2xl shadow-lg;
+    @apply flex items-center justify-center transition-all duration-200;
+    @apply hover:scale-[1.08] active:scale-[0.93];
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+    color: hsl(var(--primary-foreground));
+    border: 1px solid hsl(var(--glass-border));
+    box-shadow: 
+      0 8px 24px -4px hsl(var(--primary) / 0.4),
+      inset 0 1px 0 hsl(var(--glass-border));
+    pointer-events: auto;
+  }
+
+  .fab-button:hover {
+    box-shadow: 
+      0 12px 32px -6px hsl(var(--primary) / 0.5),
+      inset 0 1px 0 hsl(var(--glass-border));
+  }
+}
+
+/* Optimized Animations - no blur filters in animations */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes tabFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Legacy animation names kept for compatibility */
+@keyframes slideInLiquid {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes morphIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes liquidFloat {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+.animate-liquid-float {
+  animation: liquidFloat 4s ease-in-out infinite;
+}
+
+.animate-glow-pulse {
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
+.animate-slide-in-liquid {
+  animation: slideInLiquid 0.35s ease-out both;
+}
+
+.animate-morph-in {
+  animation: morphIn 0.3s ease-out both;
+}
+
+.animate-tab-enter {
+  animation: tabFadeIn 0.25s ease-out;
+}
+
+.animate-fade-in-up {
+  animation: tabFadeIn 0.3s ease-out;
+}
+
+/* Modal Viewport Fix for Mobile */
+.modal-container {
+  height: 100dvh;
+  height: 100vh;
+}
+
+.modal-content {
+  max-height: 90vh;
+  max-height: 90dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
