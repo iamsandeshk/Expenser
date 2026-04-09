@@ -1,73 +1,142 @@
-# Welcome to your Lovable project
+# SplitMate
 
-## Project info
+SplitMate is a personal and shared expense tracker built with React, TypeScript, Vite, Tailwind, and Capacitor.
 
-**URL**: https://lovable.dev/projects/dc7ce2d6-40a0-4ca8-afe4-ec7b89291999
+It helps users:
+- track personal income and expenses
+- manage shared expenses with people and groups
+- capture SMS transaction alerts and review them before moving to Personal, Split, or Group
+- use mobile-first features such as native ads, backup hooks, and account-based customization
 
-## How can I edit this code?
+Current app version: 4.1.0
 
-There are several ways of editing your application.
+## Core Features
 
-**Use Lovable**
+### Personal and Shared Tracking
+- Personal tab with income and expense handling
+- Split tab for person-based shared transactions
+- Group tab flow for group expenses and participant splits
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/dc7ce2d6-40a0-4ca8-afe4-ec7b89291999) and start prompting.
+### SMS Transaction Workflow
+- Dedicated SMS Transactions page
+- Toggle-based SMS capture (off by default)
+- Optional auto-approve to Personal
+- Date-aware transaction cards with direction-aware amounts
+- Counterparty extraction from SMS text (payer/payee)
+- Payment app detection badge (for example UPI app or bank rails)
+- Duplicate prevention for:
+	- SMS queue ingestion
+	- auto-approved entries in Personal
 
-Changes made via Lovable will be committed automatically to this repo.
+### UI and Account Experience
+- Mobile-oriented card layouts and edit sheets
+- Account quick access and profile support
+- Optional ad-free behavior and native ad cards
 
-**Use your preferred IDE**
+## Tech Stack
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+- React 18
+- TypeScript
+- Vite 5
+- Tailwind CSS
+- Radix UI primitives
+- Capacitor 8 (Android support included)
+- Firebase and Supabase integrations (project-dependent usage)
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## Project Structure
 
-Follow these steps:
+- src/components: UI components and tab screens
+- src/components/tabs: primary tab pages including SMS Transactions
+- src/lib/storage.ts: local storage models and persistence helpers
+- src/plugins: native plugin wrappers (for example SMS capture)
+- android: Capacitor Android project
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+## Getting Started
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### Prerequisites
+- Node.js 18+
+- npm
 
-# Step 3: Install the necessary dependencies.
-npm i
+### Install Dependencies
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+1. Open a terminal in the project root.
+2. Run:
+
+```bash
+npm install
+```
+
+### Start Development Server
+
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Build for Production
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```bash
+npm run build
+```
 
-**Use GitHub Codespaces**
+### Preview Production Build
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```bash
+npm run preview
+```
 
-## What technologies are used for this project?
+### Lint
 
-This project is built with:
+```bash
+npm run lint
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Mobile (Capacitor Android)
 
-## How can I deploy this project?
+If you are working on Android:
 
-Simply open [Lovable](https://lovable.dev/projects/dc7ce2d6-40a0-4ca8-afe4-ec7b89291999) and click on Share -> Publish.
+1. Build web assets:
 
-## Can I connect a custom domain to my Lovable project?
+```bash
+npm run build
+```
 
-Yes, you can!
+2. Sync Capacitor project:
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+```bash
+npx cap sync android
+```
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+3. Open Android project:
+
+```bash
+npx cap open android
+```
+
+Then run from Android Studio.
+
+## SMS Capture Notes
+
+- SMS permission is requested only when SMS capture is enabled.
+- On first enable, a local checkpoint timestamp is set to avoid importing historical SMS.
+- New message processing uses timestamp checkpointing and duplicate signatures.
+- Auto-approve path also checks existing Personal entries to prevent repeated inserts.
+
+## Demo Data Behavior
+
+SMS demo transactions are shown only for this account email:
+
+- sandeshkullolli4@gmail.com
+
+Demo rows are visible in the SMS Transactions list only and are dismissible by approve or discard actions.
+
+## Scripts
+
+- dev: start Vite dev server
+- build: production build
+- build:dev: development-mode build
+- preview: preview built app
+- lint: run ESLint
+
+## License
+
+This repository currently has no explicit license file. Add a LICENSE file if you want to define usage terms.
