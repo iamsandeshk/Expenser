@@ -203,7 +203,7 @@ export function AccountsTab({ onOpenAccount, onBack, bannerAdActive = true }: Ac
                   <div className="flex items-end justify-between gap-3">
                     <div>
                       <p className="text-[9px] uppercase tracking-wider font-black text-muted-foreground/50">Used</p>
-                      <MoneyDisplay amount={-spent} className="text-sm font-black text-foreground" />
+                      <MoneyDisplay amount={-spent} className="text-sm font-black text-red-500" />
                     </div>
                     <div className="text-right">
                       <p className="text-[9px] uppercase tracking-wider font-black text-muted-foreground/50">Available</p>

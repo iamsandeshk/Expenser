@@ -40,6 +40,33 @@ const PRO_FEATURES = [
   { icon: MessageCircle, name: 'Priority Dev Support', desc: 'Get quick responses and direct support from the developer.' },
 ];
 
+const PRO_FEATURE_BY_NAME = Object.fromEntries(
+  PRO_FEATURES.map((feature) => [feature.name, feature]),
+) as Record<string, (typeof PRO_FEATURES)[number]>;
+
+const FEATURE_GROUPS: Array<{ title: string; items: string[]; cardTone: string }> = [
+  {
+    title: 'Core Experience',
+    items: ['Ad-free Experience', 'Massive Transaction History', 'Financial Freedom'],
+    cardTone: 'bg-card/90',
+  },
+  {
+    title: 'Sharing & Collaboration',
+    items: ['Unlimited Shared Members', 'Multiple Groups', 'Friend Collaboration'],
+    cardTone: 'bg-card/80',
+  },
+  {
+    title: 'Organization & Tools',
+    items: ['Unlimited Links', 'Grouped Links', 'Subscription Mastery'],
+    cardTone: 'bg-card/80',
+  },
+  {
+    title: 'Security & Support',
+    items: ['Advanced Data Security', 'Priority Dev Support'],
+    cardTone: 'bg-card/60',
+  },
+];
+
 const PLAN_CONFIG: Record<ProPlanId, { title: string; cta: string; accent: string; tag: string; highlight: string; cadence: string; }> = {
   monthly: {
     title: 'Monthly',
@@ -183,30 +210,30 @@ export default function ProUpgradeScreen() {
               <div
                 key={planId}
                 className={cn(
-                    'group relative p-4 sm:p-5 rounded-[2rem] bg-card border overflow-hidden active:scale-95 transition-all duration-300 shadow-lg',
-                  plan === planId ? 'border-primary/40 shadow-primary/10 ring-1 ring-primary/20' : 'border-border/70',
+                    'group relative p-4 sm:p-5 rounded-xl border overflow-hidden active:scale-95 transition-all duration-300 shadow-sm',
+                  planId === 'yearly' ? 'border-primary bg-primary/5' : 'border-border/70 bg-card',
+                  plan === planId && 'ring-1 ring-primary/20',
                 )}
               >
-                <div className={cn('absolute inset-x-0 top-0 h-1 bg-gradient-to-r opacity-70', PLAN_CONFIG[planId].accent)} />
                   <div className="absolute top-0 right-0 p-3">
                     <div className={cn('px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest italic bg-muted/50 border border-border', planId === 'yearly' ? 'text-amber-500' : 'text-muted-foreground')}>
                     {PLAN_CONFIG[planId].tag}
                   </div>
                 </div>
 
-                  <div className="flex items-start justify-between gap-4 pr-0 sm:pr-1 mt-1">
+                  <div className="flex items-center justify-between gap-4 pr-0 sm:pr-1 mt-1">
                     <div className="min-w-0 flex-1 space-y-1.5 pt-2">
-                      <h3 className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground/80">{PLAN_CONFIG[planId].title} Access</h3>
+                      <h3 className="text-xs font-semibold text-muted-foreground">{PLAN_CONFIG[planId].title} Access</h3>
                       <div className="flex flex-col items-start gap-1">
                         {renderPrice(planId)}
-                        <p className="text-[9px] font-black uppercase tracking-[0.24em] text-primary/80">{PLAN_CONFIG[planId].cadence}</p>
+                        <p className="text-xs text-muted-foreground">{PLAN_CONFIG[planId].cadence}</p>
                   </div>
                     </div>
                     <div className="shrink-0 flex items-start pt-7 sm:pt-5">
                       <Button
                         type="button"
                         variant={plan === planId ? 'secondary' : 'premium'}
-                        className={cn('h-11 px-4 rounded-full text-[10px] uppercase tracking-[0.22em] font-black min-w-[96px] shadow-md', plan === planId && 'bg-white/10 text-white')}
+                        className={cn('h-10 px-4 rounded-full text-xs font-semibold min-w-[96px] shadow-sm', plan === planId && 'bg-white/10 text-white')}
                         disabled={loading || proLoading || busyPlanId !== null || !isNative}
                         onClick={() => void handlePurchase(planId)}
                       >
@@ -223,42 +250,97 @@ export default function ProUpgradeScreen() {
           </div>
         )}
 
-        <div className="space-y-6">
+        <div className="space-y-5">
           <div className="flex items-center gap-4 px-2">
-            <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-primary italic">Inside The Pro Pass</h2>
+            <h2 className="text-[10px] font-black uppercase tracking-[0.25em] text-primary">Inside The Pro Pass</h2>
             <div className="h-[1px] flex-1 bg-gradient-to-r from-primary/30 to-transparent" />
           </div>
 
-          <div className="grid grid-cols-1 gap-3">
-            {PRO_FEATURES.map((feature) => (
-              <div key={feature.name} className="flex gap-4 p-4 rounded-[1.75rem] bg-card/80 border border-border active:scale-[0.98] transition-all shadow-sm">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 border border-primary/10">
-                  <feature.icon size={18} className="text-primary" strokeWidth={2.5} />
-                </div>
-                <div className="space-y-1">
-                  <h4 className="text-sm font-black uppercase tracking-tight italic text-foreground leading-none">{feature.name}</h4>
-                  <p className="text-[10px] font-medium text-muted-foreground/70 leading-relaxed uppercase tracking-wide">{feature.desc}</p>
+          <div className="space-y-5">
+            {FEATURE_GROUPS.map((group) => (
+              <div key={group.title} className="space-y-3">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-[0.25em] px-2">
+                  {group.title}
+                </p>
+
+                <div className={cn(
+                  'rounded-xl border border-border/10 overflow-hidden',
+                  group.cardTone
+                )}>
+                  {group.items.map((featureName, index) => {
+                    const feature = PRO_FEATURE_BY_NAME[featureName];
+                    if (!feature) return null;
+
+                    return (
+                      <div
+                        key={feature.name}
+                        className={cn(
+                          'flex gap-3 p-3.5',
+                          index !== group.items.length - 1 && 'border-b border-border/10'
+                        )}
+                      >
+                        <div className="mt-0.5 text-primary">
+                          <feature.icon size={16} strokeWidth={2.3} />
+                        </div>
+
+                        <div className="space-y-0.5">
+                          <p className="text-sm font-semibold text-foreground">
+                            {feature.name}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground leading-snug">
+                            {feature.desc}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="p-5 rounded-[2rem] bg-card/80 border border-border space-y-3 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/10">
+        <div className="p-4 rounded-xl bg-card/80 border border-border shadow-sm space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-muted/40 flex items-center justify-center border border-border/10">
               <img
                 src="/assets/pro-verified-gold.png"
                 alt="Pro verified"
                 className="w-6 h-6 object-contain"
               />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-foreground">Your current status</h3>
+                <p className="text-xs text-muted-foreground truncate">
+                  {isPro ? `Pro active${plan ? ` · ${getPlanLabel(plan)}` : ''}` : 'No active Pro plan yet'}
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-sm font-black uppercase tracking-tight italic">Your current status</h3>
-              <p className="text-[10px] font-medium text-muted-foreground/70 uppercase tracking-widest">
-                {isPro ? `Pro active${plan ? ` · ${getPlanLabel(plan)}` : ''}` : 'No active Pro plan yet'}
-              </p>
-            </div>
+
+            {!isEffectivePro && (
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="h-9 px-4 rounded-full text-xs font-medium"
+                  onClick={() => void handleRestore()}
+                  disabled={restoring || loading || proLoading}
+                >
+                  {restoring ? 'Restoring...' : 'Restore'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-9 w-9 rounded-full border border-border/20"
+                  onClick={() => void handleRefreshStore()}
+                  disabled={restoring || loading || proLoading || !isNative}
+                  aria-label="Refresh store"
+                >
+                  <RefreshCw size={16} className={refreshSpinning || restoring ? 'animate-spin' : ''} />
+                </Button>
+              </div>
+            )}
           </div>
 
           {error && (
@@ -267,29 +349,6 @@ export default function ProUpgradeScreen() {
             </p>
           )}
 
-          {!isEffectivePro && (
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 items-center">
-              <Button
-                type="button"
-                variant="secondary"
-                className="h-14 rounded-[1.5rem] uppercase tracking-[0.2em] font-black"
-                onClick={() => void handleRestore()}
-                disabled={restoring || loading || proLoading}
-              >
-                {restoring ? 'Restoring...' : 'Restore'}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-14 w-14 rounded-[1.5rem] border-border bg-card/80 text-foreground shadow-sm"
-                onClick={() => void handleRefreshStore()}
-                disabled={restoring || loading || proLoading || !isNative}
-                aria-label="Refresh store"
-              >
-                <RefreshCw size={18} className={refreshSpinning || restoring ? 'animate-spin' : ''} />
-              </Button>
-            </div>
-          )}
         </div>
 
         {isEffectivePro && (

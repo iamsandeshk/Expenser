@@ -969,7 +969,7 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
   const hasAnySelection = deleteSelections.personal || deleteSelections.shared || deleteSelections.links || deleteSelections.more;
 
   return (
-    <div className="p-4 space-y-4 pb-20">
+    <div className="p-4 space-y-6 pb-20">
       {/* Header */}
       <div className="pt-4 pb-1 flex items-center justify-between gap-4">
         <div className="flex items-center gap-4 flex-1">
@@ -991,7 +991,9 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
       </div>
 
       {/* Account Profile */}
-      <div className="p-4 space-y-4">
+      <div>
+        <p className="text-xs text-muted-foreground px-2 mb-2 uppercase"></p>
+      <div className="p-3.5 space-y-4">
         <div className="flex items-center justify-center pt-2">
           <button
             onClick={() => {
@@ -1177,7 +1179,10 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
           </>
         ) : null}
       </div>
+      </div>
 
+      <div>
+        <p className="text-xs text-muted-foreground px-2 mb-2 uppercase">PRO</p>
       <div className="ios-card-modern p-1.5 overflow-hidden mb-4">
         <button
           onClick={() => navigate('/pro')}
@@ -1186,12 +1191,11 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
             background: isEffectivePro
               ? 'linear-gradient(135deg, hsl(var(--card)), hsl(var(--muted) / 0.55))'
               : 'linear-gradient(135deg, hsl(var(--card)), hsl(var(--muted) / 0.35))',
-            border: isEffectivePro
-              ? '1.5px solid hsl(142 70% 45% / 0.25)'
-              : '1.5px solid hsl(var(--primary) / 0.2)'
+            border: '1px solid hsl(var(--border) / 0.2)',
+            boxShadow: '0 4px 12px -6px hsl(var(--primary) / 0.25)',
           }}
         >
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-primary/10 border border-primary/20 shadow-inner group-hover:scale-110 transition-transform duration-500">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-primary/10 border border-primary/15 transition-transform duration-300">
             <img
               src="/assets/pro-verified-gold.png"
               alt="Pro verified"
@@ -1199,22 +1203,23 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
             />
           </div>
           <div className="flex-1 text-left">
-            <h2 className="font-black text-sm uppercase italic tracking-tight text-foreground mb-0.5">
-              {isEffectivePro ? 'Check Pro Features' : 'Unlock Pro Pass'}
+            <h2 className="font-semibold text-sm text-foreground mb-0.5">
+              Pro Features
             </h2>
-            <div className="flex items-center gap-1.5">
-              <p className={cn('text-[9px] font-black uppercase tracking-[0.1em] italic', isEffectivePro ? 'text-success/70' : 'text-primary/60')}>
-                {isEffectivePro ? `Current plan: ${plan ?? 'Pro'}` : 'Unlimited Features & Sync'}
-              </p>
-              <span className="w-1 h-1 rounded-full bg-primary/30" />
-              <p className="text-[9px] text-amber-500/60 font-black uppercase tracking-[0.1em] italic"></p>
-            </div>
+            <p className={cn('text-[11px] text-muted-foreground', isEffectivePro && 'text-success/80')}>
+              {isEffectivePro ? `Current plan: ${plan ?? 'Pro'}` : 'Upgrade to unlock premium tools'}
+            </p>
           </div>
           <div className="flex items-center justify-center w-6 h-6 shrink-0 transition-transform duration-300 group-hover:translate-x-0.5">
             <ChevronRight size={18} className="text-muted-foreground/60 group-hover:text-primary transition-colors" />
           </div>
         </button>
       </div>
+      </div>
+
+      <div>
+        <p className="text-xs text-muted-foreground px-2 mb-2 uppercase">PREFERENCES</p>
+        <div className="space-y-3">
 
       {/* Customization */}
       <div className="ios-card-modern p-1.5 overflow-hidden">
@@ -1263,8 +1268,13 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
           </div>
         </button>
       </div>
+        </div>
+      </div>
 
       {/* Pro Toggle - Testing */}
+      <div>
+        <p className="text-xs text-muted-foreground px-2 mb-2 uppercase">DATA</p>
+        <div className="space-y-3">
       {isDevOverrideEmail(profile?.email) && (
         <div className="ios-card-modern p-1.5 overflow-hidden">
           <div
@@ -1406,6 +1416,8 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
           )}
         </div>
       </div>}
+        </div>
+      </div>
 
       {/* Animation Settings Modal */}
       {createPortal(
@@ -1550,7 +1562,7 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
 
 
       {/* Backup & Restore */}
-      <div className="ios-card-modern p-4 space-y-3">
+      <div className="ios-card-modern p-3.5 space-y-3">
         <div className="flex items-center justify-between gap-4 mb-1">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 bg-secondary rounded-xl flex items-center justify-center">
@@ -1727,10 +1739,13 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
         </button>
       </div>
 
+      <div>
+        <p className="text-xs text-muted-foreground px-2 mb-2 uppercase">ABOUT</p>
+        <div className="space-y-3">
       {/* About Developer */}
       <div className="ios-card-modern p-1.5 overflow-hidden"
         style={{ border: '1px solid hsl(var(--primary) / 0.15)', background: 'hsl(var(--primary) / 0.02)' }}>
-        <div className="p-4 space-y-4">
+        <div className="p-3.5 space-y-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'hsl(var(--primary) / 0.12)' }}>
               <UserCircle2 size={20} className="text-primary" />
@@ -1771,7 +1786,7 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
 
       {/* About */}
       <div className="ios-card-modern p-1.5 overflow-hidden">
-        <div className="p-4 flex items-center gap-4">
+        <div className="p-3.5 flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
             style={{
               background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)))',
@@ -1788,6 +1803,8 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
               100% Private & Secure. All data is stored locally on your device.
             </p>
           </div>
+        </div>
+      </div>
         </div>
       </div>
 
@@ -1838,7 +1855,7 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-2 rounded-xl bg-secondary/30 p-1 border border-border/10">
                 {([
                   { mode: 'light' as ThemeMode, icon: Sun, label: 'Light' },
                   { mode: 'dark' as ThemeMode, icon: Moon, label: 'Dark' },
@@ -1847,22 +1864,22 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
                   <button
                     key={mode}
                     onClick={() => handleThemeChange(mode)}
-                    className="flex flex-col items-center justify-center gap-2 py-4 rounded-[1.75rem] border transition-all duration-300 font-bold group"
+                    className="h-10 flex items-center justify-center gap-1.5 rounded-lg border transition-all duration-300 font-semibold group"
                     style={{
-                      background: theme === mode ? 'hsl(var(--primary) / 0.1)' : 'hsl(var(--secondary) / 0.4)',
-                      borderColor: theme === mode ? 'hsl(var(--primary) / 0.3)' : 'transparent',
-                      transform: theme === mode ? 'scale(1.02)' : 'scale(1)'
+                      background: theme === mode ? 'hsl(var(--primary) / 0.1)' : 'transparent',
+                      borderColor: theme === mode ? 'hsl(var(--primary) / 0.2)' : 'transparent',
+                      transform: theme === mode ? 'scale(1.01)' : 'scale(1)'
                     }}
                   >
                     <Icon
-                      size={18}
+                      size={15}
                       className={cn(
                         "transition-transform group-hover:scale-110",
                         theme === mode ? "text-primary" : "text-gray-400"
                       )}
                     />
                     <span className={cn(
-                      "text-[10px] uppercase tracking-widest",
+                      "text-[10px] uppercase tracking-wide",
                       theme === mode ? "text-primary" : "text-gray-500"
                     )}>{label}</span>
                   </button>
@@ -1882,7 +1899,7 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-5 gap-3">
                 {quickCurrencies.map((c) => (
                   <button
                     key={c.code}
@@ -1892,8 +1909,9 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
                     <div
                       className="w-14 h-14 rounded-full border flex items-center justify-center transition-all duration-300"
                       style={{
-                        background: selectedCurrency === c.code ? 'hsl(var(--primary) / 0.12)' : 'hsl(var(--secondary) / 0.35)',
-                        borderColor: selectedCurrency === c.code ? 'hsl(var(--primary) / 0.35)' : 'hsl(var(--border) / 0.15)',
+                        background: 'hsl(var(--secondary) / 0.35)',
+                        borderColor: selectedCurrency === c.code ? 'hsl(var(--primary) / 0.2)' : 'hsl(var(--border) / 0.15)',
+                        boxShadow: selectedCurrency === c.code ? '0 0 0 2px hsl(var(--primary) / 0.18)' : 'none',
                       }}
                     >
                       <span
@@ -1922,7 +1940,7 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
                 className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-secondary/60 hover:bg-secondary text-[11px] font-bold text-foreground uppercase tracking-widest transition-all active:scale-95 border border-border/5"
               >
                 <Search size={14} className="text-primary" />
-                View Full Database
+                View All Currencies
               </button>
             </div>
 
@@ -1938,7 +1956,7 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
                 </div>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {homeSettings.sectionOrder.map((sectionId, index) => {
                   const item = [
                     { id: 'stats', label: 'Stats & Totals', icon: Activity, desc: 'Incoming, outgoing & person counts', settingKey: 'showStats' },
@@ -1965,7 +1983,7 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
                       className={cn(
                         "w-full flex items-center gap-3 p-3 rounded-2xl transition-all border",
                         isEnabled
-                          ? "bg-primary/5 border-primary/20"
+                          ? "bg-primary/10 border-primary/20"
                           : "bg-secondary/20 border-transparent grayscale-[0.6] opacity-70"
                       )}
                     >
@@ -1984,8 +2002,8 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
                           <item.icon size={18} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-bold text-sm text-foreground leading-tight">{item.label}</p>
-                          <p className="text-[10px] text-muted-foreground font-medium mt-0.5 truncate">{item.desc}</p>
+                          <p className={cn("font-bold text-sm leading-tight", isEnabled ? "text-foreground" : "text-muted-foreground")}>{item.label}</p>
+                          <p className={cn("text-[10px] font-medium mt-0.5 truncate", isEnabled ? "text-muted-foreground" : "text-muted-foreground/70")}>{item.desc}</p>
                         </div>
                         <div className={cn(
                           "w-5 h-5 rounded-full flex items-center justify-center border transition-all shrink-0",
@@ -2013,7 +2031,7 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
                           type="button"
                           disabled={index === 0}
                           onClick={(e) => { e.stopPropagation(); moveHomeSection(item.id, 'up'); }}
-                          className="w-7 h-7 rounded-lg flex items-center justify-center bg-secondary/50 text-muted-foreground disabled:opacity-30 active:scale-90 transition-all hover:bg-secondary"
+                          className="w-7 h-7 rounded-lg flex items-center justify-center bg-transparent text-muted-foreground disabled:opacity-30 active:scale-90 transition-all hover:bg-secondary/40"
                         >
                           <ChevronUp size={14} strokeWidth={2.5} />
                         </button>
@@ -2021,7 +2039,7 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
                           type="button"
                           disabled={index === homeSettings.sectionOrder.length - 1}
                           onClick={(e) => { e.stopPropagation(); moveHomeSection(item.id, 'down'); }}
-                          className="w-7 h-7 rounded-lg flex items-center justify-center bg-secondary/50 text-muted-foreground disabled:opacity-30 active:scale-90 transition-all hover:bg-secondary"
+                          className="w-7 h-7 rounded-lg flex items-center justify-center bg-transparent text-muted-foreground disabled:opacity-30 active:scale-90 transition-all hover:bg-secondary/40"
                         >
                           <ChevronDown size={14} strokeWidth={2.5} />
                         </button>
@@ -2190,7 +2208,7 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
                 </div>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-2.5">
 
                 {bottomTabs.map((tab, index) => {
                   const isFixed = fixedTabSet.has(tab.id);
@@ -2199,7 +2217,10 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
                   return (
                     <div
                       key={tab.id}
-                      className="flex items-center gap-3 p-2 rounded-[1.75rem] transition-all bg-secondary/30 border border-border/5"
+                      className={cn(
+                        "h-14 flex items-center gap-3 p-2 rounded-[1.75rem] transition-all bg-secondary/30 border border-border/5 active:scale-[0.98]",
+                        tab.id === 'home' && "border-l-2 border-l-primary"
+                      )}
                       ref={(el) => {
                         if (el) itemRefs.current.set(index, el);
                         else itemRefs.current.delete(index);
@@ -2296,7 +2317,7 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
                 onChange={(e) => setCurrencySearch(e.target.value)}
                 placeholder="Search by name, code, or symbol"
                 className="w-full h-11 pl-10 pr-3 rounded-2xl text-sm"
-                style={{ background: 'hsl(var(--secondary) / 0.5)', border: '1px solid hsl(var(--border) / 0.3)' }}
+                style={{ background: 'hsl(var(--muted) / 0.3)', border: '1px solid hsl(var(--border) / 0.2)' }}
                 autoFocus
               />
             </div>
@@ -2317,14 +2338,14 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
                       handleCurrencyChange(currency.code);
                       setShowCurrencyBrowser(false);
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left transition-all duration-200"
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200"
                     style={{
-                      background: isSelected ? 'hsl(var(--primary) / 0.12)' : 'hsl(var(--card))',
-                      border: `1px solid ${isSelected ? 'hsl(var(--primary) / 0.35)' : 'hsl(var(--border) / 0.25)'}`,
+                      background: isSelected ? 'hsl(var(--primary) / 0.1)' : 'hsl(var(--card))',
+                      border: `1px solid ${isSelected ? 'hsl(var(--primary) / 0.2)' : 'hsl(var(--border) / 0.25)'}`,
                     }}
                   >
                     <div
-                      className="w-11 h-11 rounded-xl flex items-center justify-center font-bold"
+                      className="w-10 h-10 rounded-lg flex items-center justify-center font-bold"
                       style={{ background: 'hsl(var(--secondary) / 0.65)', color: isSelected ? 'hsl(var(--primary))' : 'hsl(var(--foreground))' }}
                     >
                       {currency.symbol}
