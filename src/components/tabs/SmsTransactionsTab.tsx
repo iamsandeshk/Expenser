@@ -856,7 +856,7 @@ export function SmsTransactionsTab({ onOpenAccount, onBack, bannerAdActive = tru
 
               return (
                 <div key={item.id} className="flex flex-col gap-2">
-                  <div className="relative overflow-hidden rounded-xl bg-card px-3 py-2.5 shadow-sm transition-all duration-200">
+                  <div className="relative overflow-hidden rounded-2xl bg-card px-3 py-2.5 shadow-sm transition-all duration-200">
                     <div className="relative flex items-start gap-2.5">
                       <div className={cn(
                         'self-center flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border',
