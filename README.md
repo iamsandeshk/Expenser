@@ -138,9 +138,3 @@ Demo rows are visible in the SMS Transactions list only and are dismissible by a
 - preview: preview built app
 - lint: run ESLint
 
-## License
-
-This repository currently has no explicit license file. Add a LICENSE file if you want to define usage terms.
-=======
-
->>>>>>> 0014494c9e402b4d5210f58f6479d009dd170a5e
