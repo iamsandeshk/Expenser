@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Megaphone, UserCircle2 } from 'lucide-react';
-import { getAccountProfile, showRewardAd } from '@/lib/storage';
-import { isProUserCached } from '@/lib/proAccess';
+import { UserCircle2 } from 'lucide-react';
+import { getAccountProfile } from '@/lib/storage';
 
 interface AccountQuickButtonProps {
   onClick: () => void;
@@ -11,8 +10,6 @@ interface AccountQuickButtonProps {
 export function AccountQuickButton({ onClick, size = 44 }: AccountQuickButtonProps) {
   const [accountAvatar, setAccountAvatar] = useState(() => getAccountProfile().avatar || '');
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
-  const [isRewardAdLoading, setIsRewardAdLoading] = useState(false);
-  const [isEffectivePro, setIsEffectivePro] = useState(() => isProUserCached());
 
   const sanitizeAvatarUrl = (value?: string) => {
     const raw = (value || '').trim();
@@ -42,44 +39,8 @@ export function AccountQuickButton({ onClick, size = 44 }: AccountQuickButtonPro
     };
   }, []);
 
-  useEffect(() => {
-    const syncPro = () => setIsEffectivePro(isProUserCached());
-    window.addEventListener('splitmate_pro_changed', syncPro);
-    return () => window.removeEventListener('splitmate_pro_changed', syncPro);
-  }, []);
-
-  const handleRewardAdClick = async () => {
-    if (isRewardAdLoading) return;
-    setIsRewardAdLoading(true);
-    try {
-      await showRewardAd();
-    } finally {
-      setIsRewardAdLoading(false);
-    }
-  };
-
   return (
     <div className="flex items-center gap-2 shrink-0">
-      {!isEffectivePro && (
-        <button
-          type="button"
-          onClick={handleRewardAdClick}
-          className="rounded-full flex items-center justify-center overflow-hidden flex-shrink-0 transition-transform active:scale-95"
-          style={{
-            width: `${size}px`,
-            height: `${size}px`,
-            background: 'hsl(var(--card) / 0.92)',
-            border: '1px solid hsl(var(--border) / 0.45)',
-            backdropFilter: 'blur(18px)',
-            boxShadow: '0 10px 28px -12px hsl(var(--primary) / 0.32)',
-          }}
-          aria-label="Watch ad for 24 hours of ad-free experience"
-          disabled={isRewardAdLoading}
-        >
-          <Megaphone size={Math.round(size * 0.46)} className={isRewardAdLoading ? 'text-muted-foreground animate-pulse' : 'text-primary'} />
-        </button>
-      )}
-
       <button
         type="button"
         onClick={onClick}

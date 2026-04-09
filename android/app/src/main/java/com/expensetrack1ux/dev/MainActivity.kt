@@ -8,6 +8,7 @@ class MainActivity : BridgeActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         registerPlugin(NativeAdPlugin::class.java)
+        registerPlugin(SmsTransactionsPlugin::class.java)
         super.onCreate(savedInstanceState)
 
         // Initialize Google Mobile Ads SDK

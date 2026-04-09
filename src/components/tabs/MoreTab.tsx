@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeftRight, ExternalLink, Landmark, Repeat, Sparkles, Target, User, Users, WalletCards, PieChart, X, Globe, ArrowRightLeft } from 'lucide-react';
+import { ArrowLeftRight, CreditCard, ExternalLink, Landmark, Repeat, Sparkles, Target, User, Users, WalletCards, PieChart, X, Globe, ArrowRightLeft, MessageSquare } from 'lucide-react';
 import { AccountQuickButton } from '@/components/AccountQuickButton';
 import {
   FIXED_BOTTOM_TAB_IDS,
   MAX_BOTTOM_TABS,
   getBudgetPlannerConfig,
+  getAccountSummaries,
+  getSmsTransactions,
   getGoals,
   getGroups,
   getLinks,
@@ -21,7 +23,6 @@ import { useCurrency } from '@/hooks/use-currency';
 import { cn } from '@/lib/utils';
 import { CurrencyConverterModal } from '@/components/modals/CurrencyConverterModal';
 import { useBackHandler } from '@/hooks/useBackHandler';
-import { NativeAdCard } from '@/components/NativeAdCard';
 import { useAdFree } from '@/hooks/useAdFree';
 
 interface MoreTabProps {
@@ -35,6 +36,7 @@ const MORE_CARD_TAB_IDS = [
   'links',
   'categories',
   'budgets',
+  'accounts',
   'loans',
   'goals',
   'subscriptions',
@@ -44,10 +46,11 @@ const MORE_CARD_TAB_IDS = [
 const TAB_LABELS: Record<string, string> = {
   home: 'Home',
   personal: 'Personal',
-  shared: 'Shared',
+  shared: 'Split',
   links: 'Links',
   categories: 'Categories',
   budgets: 'Budgets',
+  accounts: 'Accounts',
   loans: 'Loans',
   goals: 'Goals',
   subscriptions: 'Subscriptions',
@@ -61,6 +64,7 @@ const TAB_ICONS: Record<string, any> = {
   links: ExternalLink,
   categories: PieChart,
   budgets: WalletCards,
+  accounts: CreditCard,
   loans: Landmark,
   goals: Target,
   subscriptions: Repeat,
@@ -74,6 +78,7 @@ const TAB_COLORS: Record<string, string> = {
   links: 'text-primary',
   categories: 'text-primary',
   budgets: 'text-primary',
+  accounts: 'text-primary',
   loans: 'text-warning',
   goals: 'text-success',
   subscriptions: 'text-primary',
@@ -97,6 +102,10 @@ export function MoreTab({ onOpenAccount, onOpenFeatureTab }: MoreTabProps) {
   const loansCount = getLoans().length;
   const goalsCount = getGoals().length;
   const subscriptionsCount = getSubscriptions().length;
+  const smsTransactionsCount = getSmsTransactions().length;
+  const accountSummaries = getAccountSummaries();
+  const accountsCount = accountSummaries.length;
+  const totalAccountsAvailable = accountSummaries.reduce((sum, account) => sum + account.available, 0);
   const budgetConfig = getBudgetPlannerConfig();
 
   const budgetDailyAllowanceText = useMemo(() => {
@@ -149,7 +158,7 @@ export function MoreTab({ onOpenAccount, onOpenFeatureTab }: MoreTabProps) {
     },
     {
       id: 'shared',
-      title: 'Shared',
+      title: 'Split',
       subtitle: 'Split and settle balances with your people.',
       countText: `${sharedCount} transaction${sharedCount !== 1 ? 's' : ''}`,
       countClass: 'text-warning bg-warning/10',
@@ -190,6 +199,19 @@ export function MoreTab({ onOpenAccount, onOpenFeatureTab }: MoreTabProps) {
       iconBg: 'hsl(var(--primary) / 0.1)',
       iconClass: 'text-primary',
       icon: WalletCards,
+    },
+    {
+      id: 'accounts',
+      title: 'Accounts',
+      subtitle: 'Manage Savings, Bank, Credit Card and source budgets.',
+      countText: accountsCount === 0
+        ? 'No Accounts'
+        : `${currency.symbol}${Math.abs(totalAccountsAvailable).toLocaleString(currency.locale, { maximumFractionDigits: 0 })} Available`,
+      countClass: accountsCount === 0 ? 'text-muted-foreground bg-secondary/40' : 'text-primary bg-primary/10',
+      border: 'hsl(var(--primary) / 0.15)',
+      iconBg: 'hsl(var(--primary) / 0.1)',
+      iconClass: 'text-primary',
+      icon: CreditCard,
     },
     {
       id: 'loans',
@@ -236,9 +258,21 @@ export function MoreTab({ onOpenAccount, onOpenFeatureTab }: MoreTabProps) {
       icon: ArrowRightLeft,
       isTool: true
     },
-  ]), [budgetDailyAllowanceText, goalsCount, linkCount, loansCount, personalCount, sharedCount, subscriptionsCount]);
+    {
+      id: 'sms-transactions',
+      title: 'SMS Transactions',
+      subtitle: 'Review incoming SMS debits and move them to Personal, Split or Group.',
+      countText: smsTransactionsCount > 0 ? `${smsTransactionsCount} pending` : 'Auto Capture',
+      countClass: 'text-primary bg-primary/10',
+      border: 'hsl(var(--primary) / 0.15)',
+      iconBg: 'hsl(var(--primary) / 0.1)',
+      iconClass: 'text-primary',
+      icon: MessageSquare,
+      isTool: true,
+    },
+  ]), [accountsCount, budgetDailyAllowanceText, currency.locale, currency.symbol, goalsCount, linkCount, loansCount, personalCount, sharedCount, smsTransactionsCount, subscriptionsCount, totalAccountsAvailable]);
 
-  const cardsInMore = useMemo(() => featureCards.filter((card) => !visibility.get(card.id)), [featureCards, visibility]);
+  const cardsInMore = useMemo(() => featureCards.filter((card) => card.id === 'sms-transactions' || !visibility.get(card.id)), [featureCards, visibility]);
   const currentBottomTabs = useMemo(() => tabConfig.filter((tab) => tab.visible), [tabConfig]);
   const swappableBottomTabs = useMemo(
     () => currentBottomTabs.filter((tab) => !fixedTabs.has(tab.id)),
@@ -311,11 +345,22 @@ export function MoreTab({ onOpenAccount, onOpenFeatureTab }: MoreTabProps) {
           <div className="grid grid-cols-2 gap-4">
             {cardsInMore.map((card, idx) => {
                const Icon = card.icon;
-               const isConverter = card.id === 'converter';
+              const isConverter = card.id === 'converter';
+              const isSmsTransactions = card.id === 'sms-transactions';
                return (
                   <div key={card.id} className="contents">
                     <div
-                       onClick={() => isConverter ? setShowConverter(true) : onOpenFeatureTab(card.id)}
+                    onClick={() => {
+                      if (isConverter) {
+                        setShowConverter(true);
+                        return;
+                      }
+                      if (isSmsTransactions) {
+                          onOpenFeatureTab('sms-transactions');
+                        return;
+                      }
+                      onOpenFeatureTab(card.id);
+                    }}
                        className="group relative flex flex-col p-5 rounded-[2.25rem] transition-all duration-300 active:scale-[0.96] text-left overflow-hidden cursor-pointer"
                        style={{ 
                           background: 'hsl(var(--card))',
@@ -325,31 +370,35 @@ export function MoreTab({ onOpenAccount, onOpenFeatureTab }: MoreTabProps) {
                        role="button"
                        tabIndex={0}
                     >
-                       <div className="flex items-start justify-between mb-5 relative z-10">
-                          <button
-                             type="button"
-                             onClick={(e) => {
-                                e.stopPropagation();
-                                handleSwap(card.id);
-                             }}
-                             className="h-9 px-3.5 rounded-xl text-[9px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-all active:scale-90 bg-secondary/70 border border-border/10"
-                          >
-                             <ArrowLeftRight size={10} strokeWidth={3} />
-                             Swap
-                          </button>
+                       <div className="flex items-start justify-between mb-3.5 relative z-10">
+                            {card.id !== 'sms-transactions' ? (
+                             <button
+                               type="button"
+                               onClick={(e) => {
+                                 e.stopPropagation();
+                                 handleSwap(card.id);
+                               }}
+                               className="h-9 px-3.5 rounded-xl text-[9px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-all active:scale-90 bg-secondary/70 border border-border/10"
+                             >
+                               <ArrowLeftRight size={10} strokeWidth={3} />
+                               Swap
+                             </button>
+                            ) : (
+                             <div className="h-9 px-3.5 rounded-xl text-[9px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 bg-secondary/40 border border-border/10 text-muted-foreground">
+                               <MessageSquare size={10} strokeWidth={3} />
+                               SMS
+                             </div>
+                            )}
                           <div className="w-10 h-10 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 duration-300 shadow-inner" style={{ background: card.iconBg }}>
                              <Icon size={18} className={card.iconClass} strokeWidth={2} />
                           </div>
                        </div>
 
-                       <div className="space-y-1.5 min-h-[60px] relative z-10">
-                          <h3 className="font-bold text-[15px] leading-tight tracking-tight group-hover:text-primary transition-colors">{card.title}</h3>
-                          <p className="text-[11px] text-muted-foreground/60 leading-relaxed line-clamp-2 font-medium">
-                             {card.subtitle}
-                          </p>
+                        <div className="relative z-10">
+                          <h3 className="font-bold text-[14px] leading-tight tracking-tight group-hover:text-primary transition-colors">{card.title}</h3>
                        </div>
 
-                       <div className="mt-4 relative z-10">
+                        <div className="mt-3 relative z-10">
                           <div className={cn(
                              "inline-flex items-center px-3 py-1.5 rounded-xl text-[9px] font-bold uppercase tracking-wider",
                              card.countClass
@@ -368,11 +417,9 @@ export function MoreTab({ onOpenAccount, onOpenFeatureTab }: MoreTabProps) {
                           )}
                        </div>
                     </div>
-                    {!isAdFree && idx === 0 && <NativeAdCard variant="toolbox" />}
                   </div>
                );
             })}
-            {!isAdFree && cardsInMore.length === 0 && <NativeAdCard variant="toolbox" />}
           </div>
       </div>
 
@@ -382,16 +429,6 @@ export function MoreTab({ onOpenAccount, onOpenFeatureTab }: MoreTabProps) {
            <p className="text-sm font-bold text-muted-foreground/40 italic">Pinned features are managed in your bottom navigation bar.</p>
         </div>
       )}
-
-      {/* Helper Bar */}
-      <div className="p-6 rounded-[2.5rem] bg-secondary/15 border border-border/10 flex items-center gap-4 group cursor-default">
-         <div className="w-12 h-12 rounded-2xl bg-card shadow-sm border border-border/5 flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110">
-            <Sparkles size={20} className="text-primary" />
-         </div>
-         <p className="text-[11px] text-muted-foreground leading-relaxed font-semibold italic opacity-80">
-            Organize your primary toolkit by swapping features between this drawer and your pinned footer.
-         </p>
-      </div>
 
       <CurrencyConverterModal 
          isOpen={showConverter} 

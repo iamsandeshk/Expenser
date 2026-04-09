@@ -4,7 +4,7 @@ import { saveBackupForCurrentUser } from '@/integrations/firebase/backup';
 import { getAccountProfile, exportAllData } from '@/lib/storage';
 import { isProUserCached } from '@/lib/proAccess';
 
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '4.0.0';
 
 /**
  * Hook to automatically perform a cloud backup once per day (targeting midnight/00:00).
@@ -27,7 +27,7 @@ export function useNightlyBackup() {
       if (lastBackupStr !== todayStr) {
         try {
           const payload = exportAllData();
-          await saveBackupForCurrentUser(payload, APP_VERSION);
+          await saveBackupForCurrentUser(payload, APP_VERSION, { silentIfFree: true });
           localStorage.setItem('last_nightly_backup_date', todayStr);
           console.log('[NightlyBackup] Automated daily backup successful for:', todayStr);
         } catch (error) {

@@ -58,7 +58,7 @@ export const AddGroupModal = ({ isOpen, onClose, onAdd }: AddGroupModalProps) =>
   return createPortal(
     <div className="fixed inset-0 z-[10002] flex items-end justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={handleClose}>
       <div 
-        className="w-full max-w-lg bg-card rounded-t-[2.5rem] p-7 pt-9 pb-10 space-y-6 animate-in slide-in-from-bottom-20 duration-300 shadow-2xl relative"
+        className="w-full max-w-lg bg-card rounded-t-[2.5rem] p-7 pt-9 pb-16 space-y-6 animate-in slide-in-from-bottom-20 duration-300 shadow-2xl relative"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-2">

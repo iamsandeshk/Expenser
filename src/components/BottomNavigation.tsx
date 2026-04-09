@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Home, User, Users, ExternalLink, Ellipsis,
-  Landmark, Target, Repeat, WalletCards, PieChart, ArrowLeftRight
+  Landmark, Target, Repeat, WalletCards, PieChart, ArrowLeftRight, CreditCard
 } from 'lucide-react';
 import { getTabConfig, type TabConfig, getLiquidGlassEnabled } from '@/lib/storage';
 
@@ -13,10 +13,11 @@ interface BottomNavigationProps {
 const ALL_NAV_ITEMS = [
   { id: 'home',          label: 'Home',     icon: Home },
   { id: 'personal',      label: 'Personal', icon: User },
-  { id: 'shared',        label: 'Shared',   icon: Users },
+  { id: 'shared',        label: 'Split',    icon: Users },
   { id: 'links',         label: 'Links',    icon: ExternalLink },
   { id: 'categories',    label: 'Category', icon: PieChart },
   { id: 'budgets',       label: 'Budget',   icon: WalletCards },
+  { id: 'accounts',      label: 'Accounts', icon: CreditCard },
   { id: 'loans',         label: 'Loans',    icon: Landmark },
   { id: 'goals',         label: 'Goals',    icon: Target },
   { id: 'subscriptions', label: 'Subs',     icon: Repeat },
@@ -433,6 +434,7 @@ export const BottomNavigation = ({ activeTab, onTabChange }: BottomNavigationPro
             const Icon      = item.icon;
             const isActive  = activeTab === item.id;
             const isPopping = poppingTab === item.id;
+            const shouldFillIcon = isActive && item.id !== 'accounts';
 
             return (
               <button
@@ -482,8 +484,8 @@ export const BottomNavigation = ({ activeTab, onTabChange }: BottomNavigationPro
                   ) : (
                     <Icon
                       size={22}
-                      strokeWidth={isActive ? 2.8 : 2.4}
-                      fill={isActive ? 'currentColor' : 'none'}
+                      strokeWidth={isActive ? (item.id === 'accounts' ? 2.9 : 2.8) : 2.4}
+                      fill={shouldFillIcon ? 'currentColor' : 'none'}
                     />
                   )}
                 </div>

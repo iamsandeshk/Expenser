@@ -1,3 +1,4 @@
+// Firestore security rules for the app's database.
 rules_version = '2';
 
 service cloud.firestore {

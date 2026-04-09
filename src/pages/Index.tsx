@@ -14,10 +14,12 @@ import { LinksTab } from '@/components/tabs/LinksTab';
 import { MoreTab } from '@/components/tabs/MoreTab';
 import { CategoryInsightsTab } from '@/components/tabs/CategoryInsightsTab';
 import { BudgetsTab } from '@/components/tabs/BudgetsTab';
+import { AccountsTab } from '@/components/tabs/AccountsTab';
 import { LoansTab } from '@/components/tabs/LoansTab';
 import { GoalsTab } from '@/components/tabs/GoalsTab';
 import { SubscriptionsTab } from '@/components/tabs/SubscriptionsTab';
 import { ConverterTab } from '@/components/tabs/ConverterTab';
+import { SmsTransactionsTab } from '@/components/tabs/SmsTransactionsTab';
 import { Onboarding } from '@/components/Onboarding';
 import { isOnboardingDone } from '@/lib/storage';
 import { getTabConfig, getSwipeNavEnabled, getLastActiveTab, setLastActiveTab, getPageSlideEnabled, getPersonBalances, getPersonProfile, savePersonProfile, getPendingSyncUpdates, removePendingSyncUpdate, applySyncUpdate, getRejectionUpdates, removeRejectionUpdate, addRejectionUpdate, getAccountProfile, generateId, type PendingSyncUpdate, type RejectionUpdate } from '@/lib/storage';
@@ -248,9 +250,11 @@ const Index = () => {
   const moreCardTabIds = new Set([
     'personal',
     'shared',
+    'sms-transactions',
     'links',
     'categories',
     'budgets',
+    'accounts',
     'loans',
     'goals',
     'subscriptions',
@@ -468,6 +472,10 @@ const Index = () => {
         return (
           <BudgetsTab onOpenAccount={openAccountTab} onBack={isTabInMore('budgets') ? handleFeatureBack : undefined} bannerAdActive={isTabInMore('budgets')} />
         );
+      case 'accounts':
+        return (
+          <AccountsTab onOpenAccount={openAccountTab} onBack={isTabInMore('accounts') ? handleFeatureBack : undefined} bannerAdActive={isTabInMore('accounts')} />
+        );
       case 'more':
         return (
           <MoreTab onOpenAccount={openAccountTab} onOpenFeatureTab={navigateToTab} />
@@ -487,6 +495,10 @@ const Index = () => {
       case 'converter':
         return (
           <ConverterTab onOpenAccount={openAccountTab} onBack={isTabInMore('converter') ? handleFeatureBack : undefined} bannerAdActive={isTabInMore('converter')} />
+        );
+      case 'sms-transactions':
+        return (
+          <SmsTransactionsTab onOpenAccount={openAccountTab} onBack={isTabInMore('sms-transactions') ? handleFeatureBack : undefined} bannerAdActive={isTabInMore('sms-transactions')} />
         );
       case 'account':
         return (
@@ -570,7 +582,7 @@ const Index = () => {
             transition={{ type: "spring", stiffness: 400, damping: 25, delay: 0.05 }}
             className={cn(
               "fixed right-4 z-[50]",
-              isTabInMore(activeTab) ? "bottom-10" : "bottom-[235px]"
+              isTabInMore(activeTab) ? "bottom-16" : "bottom-[240px]"
             )}
           >
             <button
@@ -604,7 +616,7 @@ const Index = () => {
             transition={{ type: "spring", stiffness: 400, damping: 25 }}
             className={cn(
               "fixed right-4 z-[50]",
-              isTabInMore(activeTab) ? "bottom-10" : "bottom-[160px]"
+              isTabInMore(activeTab) ? "bottom-16" : "bottom-[176px]"
             )}
           >
             <button

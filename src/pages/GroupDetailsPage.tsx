@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useMemo } from 'react';
-import { RefreshCw, Pencil, Share2, ChevronLeft, CheckCircle2, History, LayoutGrid, Check, X, UserPlus, Plus, Clock, Trash2, AlertCircle, Mail, Link2 } from 'lucide-react';
+import { RefreshCw, Pencil, Share2, ChevronLeft, CheckCircle2, History, LayoutGrid, Check, X, UserPlus, Plus, Clock, Trash2, AlertCircle, Mail, Link2, Lock } from 'lucide-react';
 import { MoneyDisplay } from '@/components/MoneyDisplay';
 import { GroupExpenseModal } from '@/components/modals/GroupExpenseModal';
 import {
@@ -18,7 +18,8 @@ import {
   syncGroupWithEmail,
   applySyncUpdate,
   type SharedExpense,
-  type FriendGroup
+  type FriendGroup,
+  FREE_LIMITS
 } from '@/lib/storage';
 import { cn } from '@/lib/utils';
 import { useCurrency } from '@/hooks/use-currency';
@@ -29,9 +30,12 @@ import { useBannerAd } from '@/hooks/useBannerAd';
 import { NativeAdCard } from '@/components/NativeAdCard';
 import { useAdFree } from '@/hooks/useAdFree';
 import React from 'react';
+import { useProGate } from '@/hooks/useProGate';
+import { requestProUpgrade } from '@/lib/proAccess';
 
 export default function GroupDetailsPage() {
   useBannerAd();
+  const { isPro } = useProGate();
   const { isAdFree } = useAdFree();
   const { groupId } = useParams<{ groupId: string }>();
   const navigate = useNavigate();
@@ -442,10 +446,33 @@ export default function GroupDetailsPage() {
                     )}
                   </div>
                 )}
-                {staticGroup.syncEmails?.map(email => {
+                {staticGroup.syncEmails?.map((email, index) => {
+                  const isLockedCollaborator = !isPro && index >= FREE_LIMITS.MAX_COLLAB_EMAILS;
                   const mappedName = Object.entries(staticGroup.memberEmails || {}).find(([_, e]) => e === email)?.[0];
                   return (
-                    <div key={email} className="w-full flex items-center justify-between pl-4 pr-3 py-3 rounded-2xl bg-secondary/15 border border-white/5 hover:bg-secondary/25 transition-all group/chip">
+                    <div
+                      key={email}
+                      className={cn(
+                        "w-full flex items-center justify-between pl-4 pr-3 py-3 rounded-2xl bg-secondary/15 border border-white/5 hover:bg-secondary/25 transition-all group/chip relative",
+                        isLockedCollaborator && 'opacity-40'
+                      )}
+                    >
+                      {isLockedCollaborator && (
+                        <>
+                          <div className="absolute top-2 right-2 z-30 w-7 h-7 rounded-lg bg-black/55 border border-white/20 flex items-center justify-center">
+                            <Lock size={12} className="text-white" />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              requestProUpgrade('collaboration', 'Free users can sync with only 1 collaborator. Upgrade to Pro for multi-person collaboration.');
+                            }}
+                            className="absolute inset-0 z-40 pointer-events-auto"
+                            aria-label="Upgrade to unlock this collaborator"
+                          />
+                        </>
+                      )}
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0 shadow-sm border border-primary/10">
                           <Mail size={14} />
@@ -463,7 +490,7 @@ export default function GroupDetailsPage() {
                         </div>
                       </div>
 
-                      {isManager && (
+                      {isManager && !isLockedCollaborator && (
                         <button
                           onClick={(e) => {
                             e.preventDefault();

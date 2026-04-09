@@ -19,15 +19,18 @@ import {
   ArrowUpRight,
   Pause,
   Play,
-  X as CloseIcon
+  X as CloseIcon,
+  Lock
 } from 'lucide-react';
 import { MoneyDisplay } from '@/components/MoneyDisplay';
-import { generateId, getSubscriptions, saveSubscriptions, type SubscriptionCycle, type SubscriptionItem, getCurrency } from '@/lib/storage';
+import { generateId, getSubscriptions, saveSubscriptions, type SubscriptionCycle, type SubscriptionItem, getCurrency, FREE_LIMITS } from '@/lib/storage';
 import { cn } from '@/lib/utils';
 import { AccountQuickButton } from '@/components/AccountQuickButton';
 import { useBackHandler } from '@/hooks/useBackHandler';
 import { NativeAdCard } from '@/components/NativeAdCard';
 import { useBannerAd } from '@/hooks/useBannerAd';
+import { useProGate } from '@/hooks/useProGate';
+import { requestProUpgrade } from '@/lib/proAccess';
 
 interface SubscriptionsTabProps {
   onOpenAccount: () => void;
@@ -107,6 +110,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export function SubscriptionsTab({ onOpenAccount, onBack, bannerAdActive = true }: SubscriptionsTabProps) {
   useBannerAd(bannerAdActive);
+  const { isPro } = useProGate();
   const [items, setItems] = useState<SubscriptionItem[]>(getSubscriptions());
   const [showAdd, setShowAdd] = useState(false);
   const [filter, setFilter] = useState<'All' | 'Monthly' | 'Yearly' | 'Weekly' | 'Paused'>('All');
@@ -293,16 +297,42 @@ export function SubscriptionsTab({ onOpenAccount, onBack, bannerAdActive = true 
         <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] pl-1">Active</h3>
 
         <div className="flex flex-col gap-5">
-          {filteredItems.map((item) => {
+          {filteredItems.map((item, index) => {
+            const isLockedSubscription = !isPro && index >= FREE_LIMITS.MAX_SUBSCRIPTIONS;
             const failed = logoLoadErrorMap[item.id] || !item.logoUrl;
             const daysUntil = getDaysUntilDue(item.startDate || item.createdAt, item.cycle, item.createdAt);
             
             return (
               <div key={item.id} className="contents">
                  <div 
-                   onClick={() => setSelectedItem(item)}
-                   className="ios-card-modern p-4 flex items-center gap-4 bg-secondary/10 border-border/5 hover:bg-secondary/20 transition-all active:scale-[0.98] cursor-pointer"
+                   onClick={() => {
+                     if (isLockedSubscription) {
+                       requestProUpgrade('subscriptions', 'Free users can track up to 2 subscriptions. Upgrade to Pro for unlimited subscriptions.');
+                       return;
+                     }
+                     setSelectedItem(item);
+                   }}
+                   className={cn(
+                     "ios-card-modern p-4 flex items-center gap-4 bg-secondary/10 border-border/5 hover:bg-secondary/20 transition-all active:scale-[0.98] cursor-pointer relative",
+                     isLockedSubscription && "opacity-40"
+                   )}
                  >
+                   {isLockedSubscription && (
+                     <>
+                       <div className="absolute top-2 right-2 z-30 w-7 h-7 rounded-lg bg-black/55 border border-white/20 flex items-center justify-center">
+                         <Lock size={12} className="text-white" />
+                       </div>
+                       <button
+                         type="button"
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           requestProUpgrade('subscriptions', 'Free users can track up to 2 subscriptions. Upgrade to Pro for unlimited subscriptions.');
+                         }}
+                         className="absolute inset-0 z-40 pointer-events-auto"
+                         aria-label="Upgrade to unlock this subscription"
+                       />
+                     </>
+                   )}
                    <div 
                     className="w-14 h-14 rounded-[22.5%] overflow-hidden flex items-center justify-center bg-black/40 border border-border/10 flex-shrink-0 shadow-inner"
                     style={{ clipPath: 'inset(0% round 22.5%)' }}
@@ -319,7 +349,7 @@ export function SubscriptionsTab({ onOpenAccount, onBack, bannerAdActive = true 
                       )}
                    </div>
                    
-                   <div className={cn("flex-1 min-w-0 transition-opacity", item.paused && "opacity-50")}>
+                    <div className={cn("flex-1 min-w-0 transition-opacity", item.paused && "opacity-50")}>
                       <div className="flex items-center justify-between gap-3 mb-1">
                         <h4 className="font-bold text-[15px] truncate flex items-center gap-2">
                           {item.appName}

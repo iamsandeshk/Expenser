@@ -59,14 +59,15 @@ import {
 } from '@/lib/storage';
 import { getStoredTheme, setStoredTheme, type ThemeMode } from '@/lib/theme';
 import { getGooglePhotoUrl, signInWithGoogle, signOutGoogle, subscribeGoogleAuth } from '@/integrations/firebase/auth';
+import { getCurrentGoogleUser } from '@/integrations/firebase/auth';
 import { loadBackupForCurrentUser, saveBackupForCurrentUser } from '@/integrations/firebase/backup';
 import { useToast } from '@/hooks/use-toast';
 import { useBackHandler } from '@/hooks/useBackHandler';
 import { useAdFree } from '@/hooks/useAdFree';
 import { useProGate } from '@/hooks/useProGate';
-import { getProOverride, isProUserCached, setProOverride } from '@/lib/proAccess';
+import { getProOverride, isDevOverrideEmail, isProUserCached, setProOverride } from '@/lib/proAccess';
 
-const APP_VERSION = '3.4';
+const APP_VERSION = '4.0.0';
 
 type DeleteStep = 'closed' | 'select' | 'confirm';
 
@@ -78,7 +79,8 @@ const DEFAULT_TAB_LAYOUT: TabConfig[] = [
   { id: 'home', visible: true },
   { id: 'personal', visible: true },
   { id: 'shared', visible: true },
-  { id: 'links', visible: true },
+  { id: 'accounts', visible: true },
+  { id: 'links', visible: false },
   { id: 'categories', visible: false },
   { id: 'budgets', visible: false },
   { id: 'loans', visible: false },
@@ -103,7 +105,7 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
   const [lastSavedProfile, setLastSavedProfile] = useState<AccountProfile>(getAccountProfile());
   const [profileSavedAt, setProfileSavedAt] = useState<number>(0);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [isGoogleConnected, setIsGoogleConnected] = useState(false);
+  const [isGoogleConnected, setIsGoogleConnected] = useState(() => Boolean(getCurrentGoogleUser() || getAccountProfile().email));
   const [isGoogleAuthBusy, setIsGoogleAuthBusy] = useState(false);
   const [isCloudBackupBusy, setIsCloudBackupBusy] = useState(false);
   const [isCloudRestoreBusy, setIsCloudRestoreBusy] = useState(false);
@@ -111,7 +113,7 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [showItemPicker, setShowItemPicker] = useState(false);
-  const [proOverrideMode, setProOverrideMode] = useState<'on' | 'off'>(() => getProOverride() ?? 'off');
+  const [proOverrideMode, setProOverrideMode] = useState<'on' | 'off'>(() => (getProOverride() === 'on' ? 'on' : 'off'));
 
   const [showCustomize, setShowCustomize] = useState(false);
   const [showAnimationMenu, setShowAnimationMenu] = useState(false);
@@ -138,10 +140,31 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
   }, []);
 
   useEffect(() => {
-    const handleProChange = () => setProOverrideMode(getProOverride() ?? 'off');
+    const handleProChange = () => setProOverrideMode(getProOverride() === 'on' ? 'on' : 'off');
     window.addEventListener('splitmate_pro_changed', handleProChange);
     return () => window.removeEventListener('splitmate_pro_changed', handleProChange);
   }, []);
+
+  useEffect(() => {
+    if (isEffectivePro || !profile.nightlyBackupEnabled) {
+      return;
+    }
+
+    const currentSaved = getAccountProfile();
+    if (!currentSaved.nightlyBackupEnabled) {
+      setProfile((prev) => (prev.nightlyBackupEnabled ? { ...prev, nightlyBackupEnabled: false } : prev));
+      return;
+    }
+
+    const updated = { ...currentSaved, nightlyBackupEnabled: false };
+    const saved = saveAccountProfile(updated);
+    if (!saved) return;
+
+    setProfile((prev) => ({ ...prev, nightlyBackupEnabled: false }));
+    if (!isEditingProfile) {
+      setLastSavedProfile(updated);
+    }
+  }, [isEffectivePro, isEditingProfile, profile.nightlyBackupEnabled]);
 
   useEffect(() => {
     if (activePicker) {
@@ -305,25 +328,14 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
         return;
       }
 
-      // Prevent race conditions with automated backups during the restore phase
-      localStorage.setItem('splitmate_restore_in_progress', 'true');
-
-      // Auto-restore from cloud on sign in
-      const backup = await loadBackupForCurrentUser();
-      if (backup?.payload) {
-        importData(backup.payload);
-        toast({ title: 'Welcome back!', description: 'Your data has been restored from your cloud backup.' });
-      } else {
-        const googleProvider = user.providerData.find((provider) => provider.providerId === 'google.com');
-        applyGoogleProfile({
-          displayName: user.displayName || googleProvider?.displayName,
-          email: user.email || googleProvider?.email,
-          photoURL: getGooglePhotoUrl(user) || googleProvider?.photoURL,
-        });
-        toast({ title: 'Signed in with Google', description: 'Starting with a fresh profile.' });
-      }
-
-      localStorage.removeItem('splitmate_restore_in_progress');
+      const googleProvider = user.providerData.find((provider) => provider.providerId === 'google.com');
+      applyGoogleProfile({
+        displayName: user.displayName || googleProvider?.displayName,
+        email: user.email || googleProvider?.email,
+        photoURL: getGooglePhotoUrl(user) || googleProvider?.photoURL,
+      });
+      setCloudBackupUpdatedAt(null);
+      toast({ title: 'Signed in with Google', description: 'Restore your cloud backup manually from Settings if you want to bring back old data.' });
       setIsGoogleConnected(true);
 
       // Refresh UI state instead of hard reloading
@@ -377,7 +389,7 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
     setIsCloudBackupBusy(true);
     try {
       const payload = exportAllData();
-      await saveBackupForCurrentUser(payload, APP_VERSION);
+      await saveBackupForCurrentUser(payload, APP_VERSION, { silentIfFree: true });
       setCloudBackupUpdatedAt(new Date());
     } catch (e) {
       console.error('Silent backup failed', e);
@@ -480,10 +492,11 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
   const TAB_LABELS: Record<string, string> = {
     home: 'Home',
     personal: 'Personal',
-    shared: 'Shared',
+    shared: 'Split',
     links: 'Links',
     categories: 'Categories',
     budgets: 'Budgets',
+    accounts: 'Accounts',
     loans: 'Loans',
     goals: 'Goals',
     subscriptions: 'Subscriptions',
@@ -498,6 +511,7 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
     links: ExternalLink,
     categories: PieChart,
     budgets: WalletCards,
+    accounts: CreditCard,
     loans: Landmark,
     goals: Target,
     subscriptions: Repeat,
@@ -512,6 +526,7 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
     links: 'text-primary',
     categories: 'text-primary',
     budgets: 'text-primary',
+    accounts: 'text-primary',
     loans: 'text-warning',
     goals: 'text-success',
     subscriptions: 'text-primary',
@@ -1010,7 +1025,13 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
         <div className="text-center space-y-1">
           <div className="flex items-center justify-center gap-1.5">
             <p className="text-base font-bold truncate">{profile.name || 'Guest'}</p>
-            {isEffectivePro && <Crown size={14} className="text-amber-400" fill="currentColor" strokeWidth={0} />}
+            {isEffectivePro && (
+              <img
+                src="/assets/pro-verified-gold.png"
+                alt="Pro verified"
+                className="w-4 h-4 object-contain"
+              />
+            )}
           </div>
           <p className="text-xs text-muted-foreground truncate">{profile.email || 'No email added yet'}</p>
           {profile.bio && (
@@ -1162,18 +1183,23 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
           onClick={() => navigate('/pro')}
           className="w-full flex items-center gap-3.5 px-4 py-4 rounded-[2rem] transition-all relative overflow-hidden group active:scale-[0.98]"
           style={{
-            background: isEffectivePro ? 'linear-gradient(135deg, #111827, #0A0A0B)' : 'linear-gradient(135deg, #161618, #0A0A0B)',
-            border: isEffectivePro ? '1.5px solid rgba(34, 197, 94, 0.25)' : '1.5px solid rgba(139, 92, 246, 0.2)'
+            background: isEffectivePro
+              ? 'linear-gradient(135deg, hsl(var(--card)), hsl(var(--muted) / 0.55))'
+              : 'linear-gradient(135deg, hsl(var(--card)), hsl(var(--muted) / 0.35))',
+            border: isEffectivePro
+              ? '1.5px solid hsl(142 70% 45% / 0.25)'
+              : '1.5px solid hsl(var(--primary) / 0.2)'
           }}
         >
-          <div className="absolute top-0 right-0 p-3">
-            <Crown size={12} className={isEffectivePro ? 'text-success italic animate-pulse' : 'text-primary italic animate-pulse'} />
-          </div>
           <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-primary/10 border border-primary/20 shadow-inner group-hover:scale-110 transition-transform duration-500">
-            <Crown size={22} className={isEffectivePro ? 'text-success' : 'text-primary'} fill="currentColor" strokeWidth={0} />
+            <img
+              src="/assets/pro-verified-gold.png"
+              alt="Pro verified"
+              className="w-6 h-6 object-contain"
+            />
           </div>
           <div className="flex-1 text-left">
-            <h2 className="font-black text-sm uppercase italic tracking-tight text-white mb-0.5">
+            <h2 className="font-black text-sm uppercase italic tracking-tight text-foreground mb-0.5">
               {isEffectivePro ? 'Check Pro Features' : 'Unlock Pro Pass'}
             </h2>
             <div className="flex items-center gap-1.5">
@@ -1181,11 +1207,11 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
                 {isEffectivePro ? `Current plan: ${plan ?? 'Pro'}` : 'Unlimited Features & Sync'}
               </p>
               <span className="w-1 h-1 rounded-full bg-primary/30" />
-              <p className="text-[9px] text-amber-500/60 font-black uppercase tracking-[0.1em] italic">Exclusive</p>
+              <p className="text-[9px] text-amber-500/60 font-black uppercase tracking-[0.1em] italic"></p>
             </div>
           </div>
-          <div className="w-8 h-8 rounded-full flex items-center justify-center bg-white/5 border border-white/5 group-hover:bg-primary/10 transition-colors">
-            <ChevronRight size={16} className="text-muted-foreground/40 group-hover:text-primary transition-colors" />
+          <div className="flex items-center justify-center w-6 h-6 shrink-0 transition-transform duration-300 group-hover:translate-x-0.5">
+            <ChevronRight size={18} className="text-muted-foreground/60 group-hover:text-primary transition-colors" />
           </div>
         </button>
       </div>
@@ -1239,15 +1265,15 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
       </div>
 
       {/* Pro Toggle - Testing */}
-      {(profile?.email && ['try.sandeshk@gmail.com', 'sandeshkullolli4@gmail.com'].includes(profile.email.toLowerCase())) && (
+      {isDevOverrideEmail(profile?.email) && (
         <div className="ios-card-modern p-1.5 overflow-hidden">
           <div
             onClick={() => {
               const next = proOverrideMode === 'on' ? 'off' : 'on';
-              setProOverride(next);
+              setProOverride(next === 'on' ? 'on' : null);
               setProOverrideMode(next);
 
-              if (next === 'off' && !isPro) {
+              if (next === 'on') {
                 localStorage.removeItem('ad_free_until');
                 setAdsEnabledState(true);
                 setAdsEnabled(true);
@@ -1255,30 +1281,30 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
               }
 
               toast({
-                title: next === 'on' ? 'Test Pro Enabled' : 'Test Pro Disabled',
-                description: next === 'on' ? 'All Pro limits and ad blocks are bypassed locally.' : 'Free-tier limits are active again.',
+                title: next === 'on' ? 'Test Free Enabled' : 'Test Free Disabled',
+                description: next === 'on' ? 'Pro access is forced off locally, including lifetime plans.' : 'Real subscription access is restored.',
               });
             }}
-            className="w-full flex items-center gap-3.5 px-4 py-4 rounded-[2rem] transition-all bg-card border border-border/10 cursor-pointer active:scale-[0.985] group"
+            className="w-full flex items-center gap-3.5 px-4 py-4 rounded-[2rem] transition-all bg-card border border-border cursor-pointer active:scale-[0.985] group shadow-sm"
           >
             <div className={cn(
               "w-11 h-11 rounded-2xl flex items-center justify-center transition-all duration-500",
-              proOverrideMode === 'on' ? "bg-warning/10 text-warning border-warning/20" : "bg-muted/10 text-muted-foreground border-muted-foreground/10"
+              proOverrideMode === 'on' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-muted/10 text-muted-foreground border-border"
             )}
               style={{ border: '1.2px solid currentColor' }}>
-              {proOverrideMode === 'on' ? <Crown size={20} /> : <Lock size={20} />}
+              {proOverrideMode === 'on' ? <Lock size={20} /> : <Crown size={20} />}
             </div>
             <div className="flex-1 text-left">
-              <h2 className="font-bold text-sm">Test Pro Mode</h2>
-              <p className="text-[11px] text-muted-foreground">Toggle local Pro on/off for QA testing</p>
+              <h2 className="font-bold text-sm">Test Free Mode</h2>
+              <p className="text-[11px] text-muted-foreground">Force local free-tier behavior for QA testing</p>
             </div>
             <div className={cn(
-              "w-12 h-6 rounded-full relative transition-all duration-300 border border-border/10 shadow-inner",
-              proOverrideMode === 'on' ? "bg-warning/20" : "bg-secondary/60"
+              "w-12 h-6 rounded-full relative transition-all duration-300 border border-border shadow-inner",
+              proOverrideMode === 'on' ? "bg-emerald-500/20" : "bg-secondary/60"
             )}>
               <div className={cn(
                 "absolute top-1 w-4 h-4 rounded-full transition-all duration-300 shadow-sm",
-                proOverrideMode === 'on' ? "left-7 bg-warning" : "left-1 bg-muted-foreground"
+                proOverrideMode === 'on' ? "left-7 bg-emerald-500" : "left-1 bg-muted-foreground"
               )} />
             </div>
           </div>
@@ -1861,13 +1887,22 @@ export function SettingsTab({ onBack }: SettingsTabProps) {
                   <button
                     key={c.code}
                     onClick={() => handleCurrencyChange(c.code)}
-                    className="group flex flex-col items-center gap-1.5 py-4 rounded-[1.5rem] border transition-all duration-300 relative overflow-hidden"
-                    style={{
-                      background: selectedCurrency === c.code ? 'hsl(var(--primary) / 0.1)' : 'hsl(var(--secondary) / 0.4)',
-                      borderColor: selectedCurrency === c.code ? 'hsl(var(--primary) / 0.3)' : 'transparent',
-                    }}
+                    className="group flex flex-col items-center gap-2 py-1 transition-all duration-300 relative"
                   >
-                    <span className="text-xl font-bold leading-none group-hover:scale-125 transition-transform duration-300" style={{ color: selectedCurrency === c.code ? 'hsl(var(--primary))' : 'hsl(var(--foreground))' }}>{c.symbol}</span>
+                    <div
+                      className="w-14 h-14 rounded-full border flex items-center justify-center transition-all duration-300"
+                      style={{
+                        background: selectedCurrency === c.code ? 'hsl(var(--primary) / 0.12)' : 'hsl(var(--secondary) / 0.35)',
+                        borderColor: selectedCurrency === c.code ? 'hsl(var(--primary) / 0.35)' : 'hsl(var(--border) / 0.15)',
+                      }}
+                    >
+                      <span
+                        className="text-2xl font-bold leading-none group-hover:scale-110 transition-transform duration-300"
+                        style={{ color: selectedCurrency === c.code ? 'hsl(var(--primary))' : 'hsl(var(--foreground))' }}
+                      >
+                        {c.symbol}
+                      </span>
+                    </div>
                     <span className={cn(
                       "text-[9px] font-black uppercase tracking-tight",
                       selectedCurrency === c.code ? "text-primary" : "text-gray-400"

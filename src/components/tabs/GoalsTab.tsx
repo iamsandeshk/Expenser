@@ -10,6 +10,9 @@ import { useToast } from '@/hooks/use-toast';
 import { useCurrency } from '@/hooks/use-currency';
 import { useBackHandler } from '@/hooks/useBackHandler';
 import { useBannerAd } from '@/hooks/useBannerAd';
+import { useProGate } from '@/hooks/useProGate';
+import { requestProUpgrade } from '@/lib/proAccess';
+import { FREE_LIMITS } from '@/lib/storage';
 
 interface GoalsTabProps {
   onOpenAccount: () => void;
@@ -19,6 +22,7 @@ interface GoalsTabProps {
 
 export function GoalsTab({ onOpenAccount, onBack, bannerAdActive = true }: GoalsTabProps) {
   useBannerAd(bannerAdActive);
+  const { isPro } = useProGate();
   const currency = useCurrency();
   const { toast } = useToast();
   const [goals, setGoals] = useState<GoalItem[]>(getGoals());
@@ -216,14 +220,27 @@ export function GoalsTab({ onOpenAccount, onBack, bannerAdActive = true }: Goals
       ) : (
         <div className="flex flex-col gap-5 w-full">
           {goals.map((goal, idx) => {
+            const isLockedGoal = !isPro && idx >= FREE_LIMITS.MAX_GOALS;
             const saved = goal.transactions.reduce((sum, tx) => sum + tx.amount, 0);
             const progress = goal.targetAmount > 0 ? Math.min(100, (saved / goal.targetAmount) * 100) : 0;
             return (
               <div key={goal.id} className="contents">
-                <button 
-                  onClick={() => openGoal(goal)} 
+                <button
+                  onClick={() => {
+                    if (isLockedGoal) {
+                      requestProUpgrade('goals', 'Free users can track 1 goal. Upgrade to Pro for unlimited goals.');
+                      return;
+                    }
+                    openGoal(goal);
+                  }}
                   className="group relative flex flex-col p-5 rounded-[2.5rem] bg-card border border-border/40 transition-all duration-300 active:scale-[0.98] text-left overflow-hidden shadow-sm hover:shadow-md w-full"
                 >
+                  {isLockedGoal && (
+                    <div className="absolute top-3 right-3 z-30 w-7 h-7 rounded-lg bg-black/55 border border-white/20 flex items-center justify-center">
+                      <Lock size={12} className="text-white" />
+                    </div>
+                  )}
+                  <div className={cn(isLockedGoal && 'opacity-40 pointer-events-none')}>
                   <div className="flex items-start justify-between gap-4 mb-4">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className={cn(
@@ -294,6 +311,7 @@ export function GoalsTab({ onOpenAccount, onBack, bannerAdActive = true }: Goals
                      className="absolute inset-x-0 bottom-0 h-1.5 transition-all duration-500 opacity-20 pointer-events-none" 
                      style={{ background: progress >= 100 ? 'hsl(var(--success))' : 'hsl(var(--primary))' }} 
                   />
+                  </div>
                 </button>
                 {idx === 0 && <NativeAdCard />}
               </div>

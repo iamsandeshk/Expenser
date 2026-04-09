@@ -10,7 +10,10 @@ export interface PersonalExpense {
   category: string;
   date: string;
   createdAt: string;
+  accountId?: string;
   isIncome?: boolean;
+  source?: 'manual' | 'sms';
+  smsExternalId?: string;
   isMirror?: boolean;
   mirrorFromId?: string;
 }
@@ -31,6 +34,42 @@ export interface SharedExpense {
   isIncoming?: boolean; // If true, it was received from sync
   createdByMe?: boolean; // Explicitly marks if created on this device
   splitParticipants?: string[]; // Everyone involved in the split
+  accountId?: string;
+}
+
+export type SmsTargetTab = 'personal' | 'split' | 'group';
+
+export interface SmsTransactionCandidate {
+  id: string;
+  externalId: string;
+  sourceAddress: string;
+  body: string;
+  amount: number;
+  date: string;
+  reason: string;
+  name: string;
+  targetTab?: SmsTargetTab;
+  targetPersonName?: string;
+  targetGroupId?: string;
+  createdAt: string;
+}
+
+export type FinancialAccountType = 'savings' | 'bank' | 'credit-card' | 'cash' | 'wallet' | 'other';
+
+export interface FinancialAccount {
+  id: string;
+  name: string;
+  type: FinancialAccountType;
+  budget: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FinancialAccountSummary extends FinancialAccount {
+  income: number;
+  personalSpent: number;
+  sharedSpent: number;
+  available: number;
 }
 
 export interface FriendGroup {
@@ -167,13 +206,16 @@ export const STORAGE_KEYS = {
   REJECTION_NOTIFICATIONS: 'splitmate_rejection_notifications',
   LAST_ACTIVE_TAB: 'splitmate_last_active_tab',
   FRIEND_GROUPS: 'splitmate_friend_groups',
+  ACCOUNTS: 'splitmate_accounts',
+  SMS_TRANSACTIONS: 'splitmate_sms_transactions',
   ADS_ENABLED: 'splitmate_ads_enabled',
 };
 
-const FREE_LIMITS = {
+export const FREE_LIMITS = {
   MAX_PERSONS: 3,
   MAX_SHARED_GROUPS: 1,
-  MAX_TRANSACTIONS: 5,
+  MAX_TRANSACTIONS: 8,
+  MAX_ACCOUNTS: 3,
   MAX_LINKS: 4,
   MAX_LINK_GROUPS: 1,
   MAX_GOALS: 1,
@@ -181,6 +223,16 @@ const FREE_LIMITS = {
   MAX_SUBSCRIPTIONS: 2,
   MAX_COLLAB_EMAILS: 1,
 } as const;
+
+function toLocalDayKey(value?: string): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 function getUniqueCollaboratorEmails(): string[] {
   const ownEmail = getAccountProfile().email?.toLowerCase().trim();
@@ -211,14 +263,20 @@ function canAddTransaction(isMirror = false): boolean {
   if (isProUserCached()) return true;
   if (isMirror) return true;
 
-  const personalCount = getPersonalExpenses().filter((item) => !item.isMirror).length;
-  const sharedCount = getSharedExpenses().length;
-  const total = personalCount + sharedCount;
+  const todayKey = toLocalDayKey(new Date().toISOString());
+  const personalCountToday = getPersonalExpenses().filter((item) => {
+    if (item.isMirror) return false;
+    return toLocalDayKey(item.createdAt || item.date) === todayKey;
+  }).length;
+  const sharedCountToday = getSharedExpenses().filter((item) => {
+    return toLocalDayKey(item.createdAt || item.date) === todayKey;
+  }).length;
+  const totalToday = personalCountToday + sharedCountToday;
 
-  if (total >= FREE_LIMITS.MAX_TRANSACTIONS) {
+  if (totalToday >= FREE_LIMITS.MAX_TRANSACTIONS) {
     requestProUpgrade(
       'transactions',
-      'Free users can add up to 5 transactions. Upgrade to Pro for unlimited history.',
+      'Free users can add up to 8 transactions per day. Upgrade to Pro for unlimited history.',
     );
     return false;
   }
@@ -2183,12 +2241,166 @@ export function clearMoreTabData(): void {
   localStorage.removeItem(STORAGE_KEYS.LOANS);
   localStorage.removeItem(STORAGE_KEYS.GOALS);
   localStorage.removeItem(STORAGE_KEYS.SUBSCRIPTIONS);
+  localStorage.removeItem(STORAGE_KEYS.ACCOUNTS);
   localStorage.removeItem(STORAGE_KEYS.QUICK_NOTES);
   localStorage.removeItem(STORAGE_KEYS.TRIP_PLANS);
   localStorage.removeItem(STORAGE_KEYS.TRIP_HISTORY);
   localStorage.removeItem(STORAGE_KEYS.TRIP_DOCUMENTS);
   localStorage.removeItem(STORAGE_KEYS.IMPORTANT_DATES);
   localStorage.removeItem(STORAGE_KEYS.SHOPPING_ITEMS);
+}
+
+export const FINANCIAL_ACCOUNT_TYPES: Array<{ value: FinancialAccountType; label: string }> = [
+  { value: 'savings', label: 'Savings' },
+  { value: 'bank', label: 'Bank' },
+  { value: 'credit-card', label: 'Credit Card' },
+  { value: 'cash', label: 'Cash' },
+  { value: 'wallet', label: 'Wallet' },
+  { value: 'other', label: 'Other' },
+];
+
+function normalizeMoney(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.round(n * 100) / 100;
+}
+
+function normalizeAccount(account: Partial<FinancialAccount>, touch = false): FinancialAccount {
+  const now = new Date().toISOString();
+  return {
+    id: account.id || generateId(),
+    name: account.name?.trim() || 'Account',
+    type: account.type || 'other',
+    budget: normalizeMoney(account.budget),
+    createdAt: account.createdAt || now,
+    updatedAt: touch ? now : account.updatedAt || now,
+  };
+}
+
+export function getAccounts(): FinancialAccount[] {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.ACCOUNTS);
+    if (!stored) return [];
+    const parsed = JSON.parse(stored) as Partial<FinancialAccount>[];
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((item) => normalizeAccount(item))
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  } catch {
+    return [];
+  }
+}
+
+export function saveAccounts(items: FinancialAccount[]): void {
+  const normalized = items.map((item) => normalizeAccount(item));
+  localStorage.setItem(STORAGE_KEYS.ACCOUNTS, JSON.stringify(normalized));
+  window.dispatchEvent(new Event('splitmate_accounts_changed'));
+  window.dispatchEvent(new Event('splitmate_data_changed'));
+}
+
+export function saveAccount(account: FinancialAccount): boolean {
+  const accounts = getAccounts();
+  const normalized = normalizeAccount(account, true);
+  const index = accounts.findIndex((item) => item.id === normalized.id);
+
+  if (index < 0 && !isProUserCached() && accounts.length >= FREE_LIMITS.MAX_ACCOUNTS) {
+    requestProUpgrade(
+      'accounts',
+      'Free users can create up to 3 accounts. Upgrade to Pro to add more accounts.',
+    );
+    return false;
+  }
+
+  if (index >= 0) {
+    normalized.createdAt = accounts[index].createdAt;
+    accounts[index] = normalized;
+  } else {
+    accounts.unshift(normalized);
+  }
+  saveAccounts(accounts);
+  return true;
+}
+
+export function deleteAccount(id: string): void {
+  const accounts = getAccounts().filter((account) => account.id !== id);
+  saveAccounts(accounts);
+}
+
+export function getAccountSummaries(): FinancialAccountSummary[] {
+  const accounts = getAccounts();
+  if (accounts.length === 0) return [];
+
+  const personal = getPersonalExpenses();
+  const shared = getSharedExpenses();
+
+  return accounts.map((account) => {
+    const relatedPersonal = personal.filter(
+      (entry) => entry.accountId === account.id && !entry.isMirror,
+    );
+
+    const income = relatedPersonal
+      .filter((entry) => !!entry.isIncome)
+      .reduce((sum, entry) => sum + entry.amount, 0);
+
+    const personalSpent = relatedPersonal
+      .filter((entry) => !entry.isIncome)
+      .reduce((sum, entry) => sum + entry.amount, 0);
+
+    const sharedSpent = shared
+      .filter((entry) => entry.accountId === account.id && entry.paidBy === 'me')
+      .reduce((sum, entry) => sum + entry.amount, 0);
+
+    const available = normalizeMoney(account.budget + income - personalSpent - sharedSpent);
+
+    return {
+      ...account,
+      income: normalizeMoney(income),
+      personalSpent: normalizeMoney(personalSpent),
+      sharedSpent: normalizeMoney(sharedSpent),
+      available,
+    };
+  });
+}
+
+export function getSmsTransactions(): SmsTransactionCandidate[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.SMS_TRANSACTIONS);
+    const parsed = raw ? (JSON.parse(raw) as SmsTransactionCandidate[]) : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  } catch {
+    return [];
+  }
+}
+
+export function saveSmsTransactions(items: SmsTransactionCandidate[]): void {
+  localStorage.setItem(STORAGE_KEYS.SMS_TRANSACTIONS, JSON.stringify(items));
+  window.dispatchEvent(new Event('splitmate_sms_transactions_changed'));
+  window.dispatchEvent(new Event('splitmate_data_changed'));
+}
+
+export function upsertSmsTransactions(items: SmsTransactionCandidate[]): void {
+  if (items.length === 0) return;
+  const existing = getSmsTransactions();
+  const byExternal = new Map(existing.map((item) => [item.externalId, item]));
+
+  items.forEach((item) => {
+    if (!item.externalId) return;
+    const prev = byExternal.get(item.externalId);
+    byExternal.set(item.externalId, prev ? { ...prev, ...item } : item);
+  });
+
+  saveSmsTransactions(Array.from(byExternal.values()));
+}
+
+export function updateSmsTransaction(id: string, updates: Partial<SmsTransactionCandidate>): void {
+  const items = getSmsTransactions().map((item) => (item.id === id ? { ...item, ...updates } : item));
+  saveSmsTransactions(items);
+}
+
+export function removeSmsTransaction(id: string): void {
+  const items = getSmsTransactions().filter((item) => item.id !== id);
+  saveSmsTransactions(items);
 }
 
 const DEFAULT_BUDGET_PLANNER_CONFIG: BudgetPlannerConfig = {
@@ -2868,7 +3080,9 @@ const DEFAULT_TABS: TabConfig[] = [
   { id: 'home', visible: true },
   { id: 'personal', visible: true },
   { id: 'shared', visible: true },
-  { id: 'links', visible: true },
+  { id: 'accounts', visible: true },
+  { id: 'sms-transactions', visible: false },
+  { id: 'links', visible: false },
   { id: 'categories', visible: false },
   { id: 'budgets', visible: false },
   { id: 'loans', visible: false },

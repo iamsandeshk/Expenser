@@ -2,7 +2,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { AccountQuickButton } from '@/components/AccountQuickButton';
-import { ArrowLeft, CalendarClock, Landmark, Plus, Trash2, X, Info, ChevronRight, History, CreditCard, Receipt, Clock, Save, Trash } from 'lucide-react';
+import { ArrowLeft, CalendarClock, Landmark, Plus, Trash2, X, Info, ChevronRight, History, CreditCard, Receipt, Clock, Save, Trash, Lock } from 'lucide-react';
 import { MoneyDisplay } from '@/components/MoneyDisplay';
 import { generateId, getLoans, saveLoans, type LoanItem, type LoanTransaction } from '@/lib/storage';
 import { useCurrency } from '@/hooks/use-currency';
@@ -11,6 +11,9 @@ import { useToast } from '@/hooks/use-toast';
 import { useBackHandler } from '@/hooks/useBackHandler';
 import { NativeAdCard } from '@/components/NativeAdCard';
 import { useBannerAd } from '@/hooks/useBannerAd';
+import { useProGate } from '@/hooks/useProGate';
+import { requestProUpgrade } from '@/lib/proAccess';
+import { FREE_LIMITS } from '@/lib/storage';
 
 interface LoansTabProps {
   onOpenAccount: () => void;
@@ -20,6 +23,7 @@ interface LoansTabProps {
 
 export function LoansTab({ onOpenAccount, onBack, bannerAdActive = true }: LoansTabProps) {
    useBannerAd(bannerAdActive);
+   const { isPro } = useProGate();
   const currency = useCurrency();
   const { toast } = useToast();
   const formatMoney = (amount: number) => {
@@ -243,7 +247,8 @@ export function LoansTab({ onOpenAccount, onBack, bannerAdActive = true }: Loans
         </div>
       ) : (
         <div className="flex flex-col gap-5">
-          {loans.map((loan, idx) => {
+               {loans.map((loan, idx) => {
+                  const isLockedLoan = !isPro && idx >= FREE_LIMITS.MAX_LOANS;
             const stats = getInterestStats(loan);
             const dueAmount = loan.outstandingPrincipal + stats.totalInterest;
             const signedDueAmount = loan.direction === 'you-borrowed' ? -dueAmount : dueAmount;
@@ -255,13 +260,36 @@ export function LoansTab({ onOpenAccount, onBack, bannerAdActive = true }: Loans
             
             return (
               <div key={loan.id} className="contents">
-                <button
-                  onClick={() => setActiveLoanId(loan.id)}
+                        <button
+                           onClick={() => {
+                              if (isLockedLoan) {
+                                 requestProUpgrade('loans', 'Free users can track 1 loan. Upgrade to Pro for unlimited loans.');
+                                 return;
+                              }
+                              setActiveLoanId(loan.id);
+                           }}
                   className={cn(
                     "group relative flex flex-col p-6 rounded-[2.5rem] bg-card border transition-all duration-300 active:scale-[0.98] text-left overflow-hidden shadow-sm hover:shadow-xl",
+                                isLockedLoan && "opacity-40",
                     isClosed ? "border-border/30 grayscale opacity-80" : "border-border/40"
                   )}
                 >
+                           {isLockedLoan && (
+                              <>
+                                 <div className="absolute top-3 right-3 z-30 w-7 h-7 rounded-lg bg-black/55 border border-white/20 flex items-center justify-center">
+                                    <Lock size={12} className="text-white" />
+                                 </div>
+                                 <button
+                                    type="button"
+                                    onClick={(e) => {
+                                       e.stopPropagation();
+                                       requestProUpgrade('loans', 'Free users can track 1 loan. Upgrade to Pro for unlimited loans.');
+                                    }}
+                                    className="absolute inset-0 z-40 pointer-events-auto"
+                                    aria-label="Upgrade to unlock this loan"
+                                 />
+                              </>
+                           )}
                   <div className="flex items-start justify-between gap-4 mb-6">
                      <div className="flex items-center gap-3 min-w-0">
                         <div className={cn(

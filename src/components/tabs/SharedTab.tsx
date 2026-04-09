@@ -2,10 +2,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Plus, CheckCircle2, Trash2, Users, BarChart3, ArrowDownRight, ArrowUpRight, Search, X, Calendar, AlertCircle, ChevronRight, Pencil, Check, Edit3 } from 'lucide-react';
+import { ChevronLeft, Plus, CheckCircle2, Trash2, Users, BarChart3, ArrowDownRight, ArrowUpRight, Search, X, Calendar, AlertCircle, ChevronRight, Pencil, Check, Edit3, Lock } from 'lucide-react';
 import { MoneyDisplay } from '@/components/MoneyDisplay';
 import { ExpenseChart } from '@/components/ExpenseChart';
-import { getPersonBalances, getSharedExpenses, deleteSharedExpense, updateSharedExpenseReason, deleteFriendGroup, settleExpenseWithPerson, getGroupBalances, settleGroup, deletePerson, type PersonBalance, type SharedExpense, type GroupBalance } from '@/lib/storage';
+import { getPersonBalances, getSharedExpenses, deleteSharedExpense, updateSharedExpenseReason, deleteFriendGroup, settleExpenseWithPerson, getGroupBalances, settleGroup, deletePerson, FREE_LIMITS, getFriendGroups, saveSharedExpense, updateSmsTransaction, type PersonBalance, type SharedExpense, type GroupBalance } from '@/lib/storage';
 import { AddSharedExpenseModal } from '@/components/modals/AddSharedExpenseModal';
 import { useCurrency } from '@/hooks/use-currency';
 import { useToast } from '@/hooks/use-toast';
@@ -15,6 +15,8 @@ import { useBackHandler } from '@/hooks/useBackHandler';
 import { NativeAdCard } from '@/components/NativeAdCard';
 import { useAdFree } from '@/hooks/useAdFree';
 import { useBannerAd } from '@/hooks/useBannerAd';
+import { useProGate } from '@/hooks/useProGate';
+import { requestProUpgrade } from '@/lib/proAccess';
 
 interface SharedTabProps {
   onOpenAccount: () => void;
@@ -24,6 +26,7 @@ interface SharedTabProps {
 
 export function SharedTab({ onOpenAccount, onBack, bannerAdActive = true }: SharedTabProps) {
   useBannerAd(bannerAdActive);
+  const { isPro } = useProGate();
   const { isAdFree } = useAdFree();
   const [personBalances, setPersonBalances] = useState<PersonBalance[]>(getPersonBalances());
   const [groupBalances, setGroupBalances] = useState<GroupBalance[]>(getGroupBalances());
@@ -336,7 +339,7 @@ export function SharedTab({ onOpenAccount, onBack, bannerAdActive = true }: Shar
               </button>
             )}
             <div>
-              <h1 className="text-2xl font-bold">Shared</h1>
+              <h1 className="text-2xl font-bold">Split</h1>
               <p className="text-sm text-muted-foreground">Split expenses with others</p>
             </div>
           </div>
@@ -426,6 +429,7 @@ export function SharedTab({ onOpenAccount, onBack, bannerAdActive = true }: Shar
         </div>
       )}
 
+
       {/* Groups & People List */}
       {sortedBalances.length === 0 && groupBalances.length === 0 ? (
         <div className="ios-card-modern p-10 text-center mt-4">
@@ -445,7 +449,9 @@ export function SharedTab({ onOpenAccount, onBack, bannerAdActive = true }: Shar
                 Active Groups ({groupBalances.length})
               </h3>
               <div className="grid grid-cols-1 gap-3">
-                {groupBalances.map((group) => (
+                {groupBalances.map((group, index) => {
+                  const isLockedGroup = !isPro && index >= FREE_LIMITS.MAX_SHARED_GROUPS;
+                  return (
                   <div
                     key={group.groupId}
                     onPointerDown={(e) => handleStartPress(group.groupId, e)}
@@ -460,11 +466,28 @@ export function SharedTab({ onOpenAccount, onBack, bannerAdActive = true }: Shar
                     }}
                     className={cn(
                       "ios-card-modern p-4 relative overflow-hidden group active:scale-[0.98] transition-all cursor-pointer",
+                      isLockedGroup && "opacity-40",
                       showDeleteFor === group.groupId && "z-20 ring-2 ring-rose-500/20"
                     )}
                   >
+                    {isLockedGroup && (
+                      <>
+                        <div className="absolute top-3 right-3 z-30 w-7 h-7 rounded-lg bg-black/50 border border-white/20 flex items-center justify-center">
+                          <Lock size={12} className="text-white" />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            requestProUpgrade('groups', 'Free users can create and manage only 1 group. Upgrade to Pro for unlimited groups.');
+                          }}
+                          className="absolute inset-0 z-40 pointer-events-auto"
+                          aria-label="Upgrade to unlock this group"
+                        />
+                      </>
+                    )}
                     {/* Delete Overlay Icon */}
-                    {showDeleteFor === group.groupId && (
+                    {showDeleteFor === group.groupId && !isLockedGroup && (
                       <div
                         className="absolute inset-0 z-20 bg-rose-500/10 backdrop-blur-[2px] flex items-center justify-end pr-4 animate-in slide-in-from-right-10"
                       >
@@ -514,7 +537,7 @@ export function SharedTab({ onOpenAccount, onBack, bannerAdActive = true }: Shar
                       </div>
                     </div>
                   </div>
-                ))}
+                )})}
               </div>
             </div>
           )}
@@ -523,7 +546,9 @@ export function SharedTab({ onOpenAccount, onBack, bannerAdActive = true }: Shar
             <h3 className="font-semibold text-muted-foreground text-[10px] uppercase tracking-[0.2em] px-1 opacity-70">
               Individual Balances ({sortedBalances.length})
             </h3>
-            {sortedBalances.map((person, index) => (
+            {sortedBalances.map((person, index) => {
+              const isLockedPerson = !isPro && index >= FREE_LIMITS.MAX_PERSONS;
+              return (
               <div key={person.name} className="flex flex-col gap-3">
                 <div
                   onPointerDown={(e) => person.name !== 'me' && handleStartPress(person.name, e)}
@@ -538,11 +563,28 @@ export function SharedTab({ onOpenAccount, onBack, bannerAdActive = true }: Shar
                   }}
                   className={cn(
                     "ios-card-modern p-4 relative overflow-hidden group active:scale-[0.98] transition-all cursor-pointer",
+                    isLockedPerson && "opacity-40",
                     showDeleteFor === person.name && "z-20 ring-2 ring-rose-500/20"
                   )}
                 >
+                  {isLockedPerson && (
+                    <>
+                      <div className="absolute top-3 right-3 z-30 w-7 h-7 rounded-lg bg-black/50 border border-white/20 flex items-center justify-center">
+                        <Lock size={12} className="text-white" />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          requestProUpgrade('persons', 'Free users can manage up to 3 people. Upgrade to Pro for unlimited people.');
+                        }}
+                        className="absolute inset-0 z-40 pointer-events-auto"
+                        aria-label="Upgrade to unlock this person"
+                      />
+                    </>
+                  )}
                   {/* Delete Overlay Icon */}
-                  {showDeleteFor === person.name && (
+                  {showDeleteFor === person.name && !isLockedPerson && (
                     <div
                       className="absolute inset-0 z-20 bg-rose-500/10 backdrop-blur-[2px] flex items-center justify-end pr-4 animate-in slide-in-from-right-10"
                     >
@@ -593,7 +635,7 @@ export function SharedTab({ onOpenAccount, onBack, bannerAdActive = true }: Shar
 
                     <div className="flex items-center gap-2">
                       <MoneyDisplay amount={person.netBalance} size="sm" showSign={true} />
-                      {person.netBalance !== 0 && (
+                      {person.netBalance !== 0 && !isLockedPerson && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -609,7 +651,7 @@ export function SharedTab({ onOpenAccount, onBack, bannerAdActive = true }: Shar
                 </div>
                 {!isAdFree && index === 0 && <NativeAdCard />}
               </div>
-            ))}
+            )})}
           </div>
         </div>
       )}
@@ -1040,6 +1082,7 @@ export function SharedTab({ onOpenAccount, onBack, bannerAdActive = true }: Shar
             </div>,
             document.body
           )}
+
         </div>
       );
 }

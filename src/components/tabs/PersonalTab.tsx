@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, ChevronLeft, ChevronRight, Plus, Search, Trash2, Calendar, X, Target, Save, AlertCircle, PieChart, CheckCircle2, Pencil, Check, Edit3, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Plus, Search, Trash2, Calendar, X, Target, Save, AlertCircle, PieChart, CheckCircle2, Pencil, Check, Edit3, SlidersHorizontal, MessageSquare } from 'lucide-react';
 import { MoneyDisplay } from '@/components/MoneyDisplay';
 import { getPersonalExpenses, deletePersonalExpense, updatePersonalExpense, type PersonalExpense, EXPENSE_CATEGORIES } from '@/lib/storage';
 import { AddPersonalExpenseModal } from '@/components/modals/AddPersonalExpenseModal';
@@ -47,6 +47,9 @@ export function PersonalTab({ onOpenAccount, onBack, bannerAdActive = true }: Pe
   const [editedReason, setEditedReason] = useState("");
   const [editedAmount, setEditedAmount] = useState("");
   const [editedDate, setEditedDate] = useState("");
+  const [editedCategory, setEditedCategory] = useState('Other');
+  const [editedType, setEditedType] = useState<'income' | 'expense'>('expense');
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [filterType, setFilterType] = useState<'all' | 'expense' | 'income'>('all');
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const filterMenuRef = useRef<HTMLDivElement>(null);
@@ -54,6 +57,7 @@ export function PersonalTab({ onOpenAccount, onBack, bannerAdActive = true }: Pe
   useBackHandler(!!viewingExpense, () => {
     setViewingExpense(null);
     setIsEditingReason(false);
+    setShowCategoryPicker(false);
   });
   useBackHandler(!!deletingId, () => setDeletingId(null));
   useBackHandler(showAddModal, () => setShowAddModal(false));
@@ -217,6 +221,13 @@ export function PersonalTab({ onOpenAccount, onBack, bannerAdActive = true }: Pe
         block: 'nearest',
       });
     });
+  };
+
+  const formatSignedAmountLabel = (amount: number, isIncome?: boolean) => {
+    const signedPrefix = isIncome ? '+' : '-';
+    const absolute = Math.abs(amount);
+    const formatted = absolute.toLocaleString(currency.locale, { maximumFractionDigits: 2 });
+    return `${signedPrefix}${currency.symbol}${formatted}`;
   };
 
   const shiftMonth = (direction: 'left' | 'right') => {
@@ -509,8 +520,13 @@ export function PersonalTab({ onOpenAccount, onBack, bannerAdActive = true }: Pe
                   className="ios-card-modern px-5 py-4 group active:scale-[0.98] transition-all overflow-hidden border border-border/10 transform-gpu cursor-pointer"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 text-xl bg-secondary/20 border border-border/5">
-                      {CATEGORY_EMOJIS[expense.category] || '📦'}
+                    <div className={cn(
+                      'w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 border',
+                      expense.source === 'sms'
+                        ? 'bg-primary/10 border-primary/20 text-primary'
+                        : 'text-xl bg-secondary/20 border-border/5',
+                    )}>
+                      {expense.source === 'sms' ? <MessageSquare size={16} strokeWidth={2.3} /> : (CATEGORY_EMOJIS[expense.category] || '📦')}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-sm text-foreground truncate tracking-tight uppercase leading-none mb-1.5">{expense.reason}</p>
@@ -528,11 +544,9 @@ export function PersonalTab({ onOpenAccount, onBack, bannerAdActive = true }: Pe
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <MoneyDisplay 
-                         amount={expense.isIncome ? expense.amount : -expense.amount} 
-                         size="sm" 
-                         className={cn("font-bold tracking-tight", expense.isIncome ? "text-emerald-500" : "text-foreground")} 
-                      />
+                      <span className={cn('font-bold tracking-tight', expense.isIncome ? 'text-emerald-500' : 'text-red-500')}>
+                        {formatSignedAmountLabel(expense.amount, expense.isIncome)}
+                      </span>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <button
                           onClick={(e) => {
@@ -588,10 +602,13 @@ export function PersonalTab({ onOpenAccount, onBack, bannerAdActive = true }: Pe
                   onClick={() => {
                     const nextMode = !isEditingReason;
                     setIsEditingReason(nextMode);
+                    setShowCategoryPicker(false);
                     if (nextMode) {
                       setEditedReason(viewingExpense.reason);
                       setEditedAmount(viewingExpense.amount.toString());
                       setEditedDate(viewingExpense.date);
+                      setEditedCategory(viewingExpense.category || 'Other');
+                      setEditedType(viewingExpense.isIncome ? 'income' : 'expense');
                     }
                   }}
                   className={cn(
@@ -617,11 +634,11 @@ export function PersonalTab({ onOpenAccount, onBack, bannerAdActive = true }: Pe
 
             {/* Central Hero Amount */}
             <div className="text-center space-y-1 py-1">
-              <p className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground/30">{viewingExpense.isIncome ? 'Total Income' : 'Total Burn'}</p>
+              <p className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground/30">{(isEditingReason ? editedType === 'income' : viewingExpense.isIncome) ? 'Total Income' : 'Total Burn'}</p>
               {isEditingReason ? (
                 <div className="flex flex-col items-center gap-1">
                   <div className="flex items-center justify-center gap-0.5">
-                    <span className={cn("text-3xl font-black", viewingExpense.isIncome ? "text-emerald-500" : "text-red-500")}>
+                    <span className={cn("text-3xl font-black", editedType === 'income' ? "text-emerald-500" : "text-red-500")}>
                       {currency.symbol}
                     </span>
                     <input
@@ -631,27 +648,37 @@ export function PersonalTab({ onOpenAccount, onBack, bannerAdActive = true }: Pe
                       onChange={(e) => setEditedAmount(e.target.value)}
                       className={cn(
                         "w-48 bg-transparent text-5xl font-black tracking-tighter text-center outline-none border-b-2 border-dashed border-primary/30 py-1",
-                        viewingExpense.isIncome ? "text-emerald-500" : "text-red-500"
+                        editedType === 'income' ? "text-emerald-500" : "text-red-500"
                       )}
                       placeholder="0.00"
                     />
                   </div>
                 </div>
               ) : (
-                <MoneyDisplay 
-                   amount={viewingExpense.isIncome ? viewingExpense.amount : -viewingExpense.amount} 
-                   size="xl" 
-                   className={cn("font-black text-5xl tracking-tighter block", viewingExpense.isIncome ? "text-emerald-500" : "text-red-500")} 
-                />
+                <span className={cn('font-black text-5xl tracking-tighter block', viewingExpense.isIncome ? 'text-emerald-500' : 'text-red-500')}>
+                  {formatSignedAmountLabel(viewingExpense.amount, viewingExpense.isIncome)}
+                </span>
               )}
             </div>
 
             {/* Status Badges */}
-            <div className="flex items-center justify-center gap-2">
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
-                <span className="text-sm">{CATEGORY_EMOJIS[viewingExpense.category] || '📦'}</span>
-                <span className="text-[9px] font-black text-primary uppercase tracking-[0.1em]">{viewingExpense.category}</span>
-              </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  disabled={!isEditingReason}
+                  onClick={() => {
+                    if (!isEditingReason) return;
+                    setShowCategoryPicker((value) => !value);
+                  }}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 transition-all',
+                    isEditingReason ? 'active:scale-95' : 'cursor-default',
+                  )}
+                >
+                  <span className="text-sm">{CATEGORY_EMOJIS[isEditingReason ? editedCategory : viewingExpense.category] || '📦'}</span>
+                  <span className="text-[9px] font-black text-primary uppercase tracking-[0.1em]">{isEditingReason ? editedCategory : viewingExpense.category}</span>
+                </button>
               {(() => {
                 const lowerReason = viewingExpense.reason.toLowerCase();
                 const match = lowerReason.match(/paid by\s+([a-zA-Z\s]+)/);
@@ -663,12 +690,70 @@ export function PersonalTab({ onOpenAccount, onBack, bannerAdActive = true }: Pe
                     paidBy ? "bg-rose-500/10 text-rose-500" : "bg-secondary text-muted-foreground"
                   )}>
                     <span className="text-[9px] font-black uppercase tracking-[0.1em]">
-                      {paidBy ? `Paid by ${paidBy}` : viewingExpense.isIncome ? "You Got" : "Paid by You"}
+                      {paidBy ? `Paid by ${paidBy}` : (isEditingReason ? editedType === 'income' : viewingExpense.isIncome) ? "You Got" : "Paid by You"}
                     </span>
                   </div>
                 );
               })()}
+              </div>
+
+              {isEditingReason && showCategoryPicker && (
+                <div className="max-h-48 overflow-y-auto rounded-2xl border border-border/15 bg-secondary/20 p-2 space-y-1.5">
+                  {EXPENSE_CATEGORIES.map((category) => (
+                    <button
+                      key={category}
+                      type="button"
+                      onClick={() => {
+                        setEditedCategory(category);
+                        setShowCategoryPicker(false);
+                      }}
+                      className={cn(
+                        'w-full h-9 rounded-xl border text-[9px] font-black uppercase tracking-[0.14em] transition-all text-left px-3',
+                        editedCategory === category
+                          ? 'bg-primary/15 text-primary border-primary/25'
+                          : 'bg-secondary/30 text-muted-foreground border-border/10',
+                      )}
+                    >
+                      {category}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
+
+            {isEditingReason && (
+              <div className="space-y-3 pt-1">
+                <div className="space-y-2">
+                  <p className="text-[8px] font-black uppercase tracking-widest text-muted-foreground/35 text-center">Type</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditedType('expense')}
+                      className={cn(
+                        'h-9 rounded-xl border text-[9px] font-black uppercase tracking-[0.14em] transition-all',
+                        editedType === 'expense'
+                          ? 'bg-rose-500/12 text-rose-500 border-rose-500/25'
+                          : 'bg-secondary/30 text-muted-foreground border-border/10',
+                      )}
+                    >
+                      Expense / Debit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditedType('income')}
+                      className={cn(
+                        'h-9 rounded-xl border text-[9px] font-black uppercase tracking-[0.14em] transition-all',
+                        editedType === 'income'
+                          ? 'bg-emerald-500/12 text-emerald-500 border-emerald-500/25'
+                          : 'bg-secondary/30 text-muted-foreground border-border/10',
+                      )}
+                    >
+                      Income / Credit
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Data Segments */}
             <div className="space-y-4 pt-1">
@@ -717,22 +802,29 @@ export function PersonalTab({ onOpenAccount, onBack, bannerAdActive = true }: Pe
                   <button 
                     onClick={() => {
                       const finalAmount = parseFloat(editedAmount) || viewingExpense.amount;
+                      const finalIsIncome = editedType === 'income';
+                      const finalCategory = finalIsIncome ? 'Income' : editedCategory;
                       
                       // Using the new robust updatePersonalExpense function
                       updatePersonalExpense(viewingExpense.id, { 
                         reason: editedReason || viewingExpense.reason,
                         amount: finalAmount,
-                        date: editedDate || viewingExpense.date
+                        date: editedDate || viewingExpense.date,
+                        category: finalCategory,
+                        isIncome: finalIsIncome,
                       });
 
                       setViewingExpense({ 
                         ...viewingExpense, 
                         reason: editedReason || viewingExpense.reason,
                         amount: finalAmount,
-                        date: editedDate || viewingExpense.date
+                        date: editedDate || viewingExpense.date,
+                        category: finalCategory,
+                        isIncome: finalIsIncome,
                       });
                       
                       setIsEditingReason(false);
+                      setShowCategoryPicker(false);
                       setExpenses(getPersonalExpenses());
                     }}
                     className="w-full h-12 rounded-2xl bg-primary text-white font-bold flex items-center justify-center gap-2 shadow-xl shadow-primary/20 active:scale-[0.98] transition-all hover:bg-primary-glow"

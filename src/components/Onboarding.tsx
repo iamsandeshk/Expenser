@@ -414,18 +414,6 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                   try {
                     const user = await signInWithGoogle();
                     if (user) {
-                      // Check for existing cloud backup to restore
-                      const backup = await loadBackupForCurrentUser();
-                      if (backup?.payload) {
-                        importData(backup.payload);
-                        toast({
-                          title: "Welcome back!",
-                          description: "Your data has been restored from the cloud."
-                        });
-                        handleFinish();
-                        return;
-                      }
-
                       const googleProvider = user.providerData.find((provider) => provider.providerId === 'google.com');
                       saveAccountProfile({
                         name: (user.displayName || googleProvider?.displayName || 'Guest').trim(),
@@ -435,7 +423,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                       });
                       toast({
                         title: "Sign In Successful!",
-                        description: `Welcome, ${user.displayName || 'Friend'}!`
+                        description: `Welcome, ${user.displayName || 'Friend'}! You can restore cloud data later from Settings.`
                       });
                       handleFinish();
                     }

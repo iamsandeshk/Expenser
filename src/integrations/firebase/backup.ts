@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import {
+  deleteDoc,
   doc,
   getDoc,
   getFirestore,
@@ -114,6 +115,21 @@ async function enforceFreeCloudAction(kind: 'backup' | 'restore') {
   }
 }
 
+type CloudLimitOptions = {
+  silentIfFree?: boolean;
+};
+
+async function enforceCloudActionWithOptions(
+  kind: 'backup' | 'restore',
+  options?: CloudLimitOptions,
+) {
+  if (options?.silentIfFree && !isProUserCached()) {
+    throw new Error('free-user-skip');
+  }
+
+  await enforceFreeCloudAction(kind);
+}
+
 async function retryOnce<T>(operation: () => Promise<T>) {
   try {
     return await operation();
@@ -125,7 +141,7 @@ async function retryOnce<T>(operation: () => Promise<T>) {
   }
 }
 
-export async function saveBackupForCurrentUser(payload: string, appVersion: string) {
+export async function saveBackupForCurrentUser(payload: string, appVersion: string, options?: CloudLimitOptions) {
   const user = getCurrentGoogleUser();
   if (!user) {
     throw new Error('auth/not-signed-in');
@@ -133,7 +149,7 @@ export async function saveBackupForCurrentUser(payload: string, appVersion: stri
 
   const ref = getBackupRef(user.uid);
   try {
-    await enforceFreeCloudAction('backup');
+    await enforceCloudActionWithOptions('backup', options);
 
     await retryOnce(() =>
       withTimeout(
@@ -155,6 +171,9 @@ export async function saveBackupForCurrentUser(payload: string, appVersion: stri
       localStorage.setItem(FREE_BACKUP_DAY_KEY, todayKey());
     }
   } catch (error) {
+    if ((error as { message?: string } | null)?.message === 'free-user-skip') {
+      return;
+    }
     throw toActionableError(error, 'Cloud backup upload failed.');
   }
 }

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { User, Tag, Wallet, ChevronLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { saveSharedExpense, generateId, getUniquePersonNames, EXPENSE_CATEGORIES, getCurrency, getSuggestedReasons, getSuggestedPersons, type SharedExpense } from '@/lib/storage';
+import { saveSharedExpense, generateId, getUniquePersonNames, EXPENSE_CATEGORIES, getAccounts, getCurrency, getSuggestedReasons, getSuggestedPersons, type SharedExpense } from '@/lib/storage';
 import { pushUpdateToCloud } from '@/integrations/firebase/sync';
 import { getPersonProfile, getAccountProfile, savePersonProfile } from '@/lib/storage';
 import { useBannerAd } from '@/hooks/useBannerAd';
@@ -38,6 +38,7 @@ export function AddSharedExpenseModal({ isOpen, onClose, onAdd, initialAmount, i
   const [personName, setPersonName] = useState('');
   const [personEmail, setPersonEmail] = useState('');
   const [paidBy, setPaidBy] = useState<'me' | 'them'>('me');
+  const [accountId, setAccountId] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const suggestions = useMemo(() => getSuggestedReasons('shared'), [isOpen]);
@@ -46,6 +47,7 @@ export function AddSharedExpenseModal({ isOpen, onClose, onAdd, initialAmount, i
   const formRef = useRef<HTMLFormElement>(null);
 
   const existingNames = getUniquePersonNames();
+  const accounts = useMemo(() => getAccounts(), [isOpen]);
   const currency = getCurrency();
 
   useEffect(() => {
@@ -61,6 +63,7 @@ export function AddSharedExpenseModal({ isOpen, onClose, onAdd, initialAmount, i
       setPersonName(initialPersonName || '');
       setPersonEmail('');
       setPaidBy('me');
+      setAccountId(getAccounts()[0]?.id || '');
       setCategory(EXPENSE_CATEGORIES[0]);
 
       if (amountRef.current) {
@@ -96,6 +99,7 @@ export function AddSharedExpenseModal({ isOpen, onClose, onAdd, initialAmount, i
       createdAt: new Date().toISOString(),
       settled: false,
       category: category || undefined,
+      accountId: paidBy === 'me' ? (accountId || undefined) : undefined,
 
       // 🔥 IMPORTANT
       fromEmail: getAccountProfile().email,
@@ -294,6 +298,31 @@ export function AddSharedExpenseModal({ isOpen, onClose, onAdd, initialAmount, i
                   {personName || 'They'} Paid
                 </button>
               </div>
+
+              {accounts.length > 0 && paidBy === 'me' && (
+                <div className="space-y-2.5">
+                  <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest block opacity-40">
+                    Paid From Account
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {accounts.map((account) => (
+                      <button
+                        key={account.id}
+                        type="button"
+                        onClick={() => setAccountId(account.id)}
+                        className={cn(
+                          'px-5 py-3 rounded-[1.45rem] text-[12px] font-black uppercase tracking-wider transition-all border',
+                          accountId === account.id
+                            ? 'bg-primary/15 text-primary border-primary/25'
+                            : 'bg-card/60 text-muted-foreground border-border/20',
+                        )}
+                      >
+                        {account.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -376,7 +405,7 @@ export function AddSharedExpenseModal({ isOpen, onClose, onAdd, initialAmount, i
       </form>
 
       {/* Fixed bottom action */}
-      <div className="flex-shrink-0 px-5 pb-8 pt-3 bg-background/80 backdrop-blur-lg border-t border-border/10">
+      <div className="flex-shrink-0 px-5 pb-16 pt-3 bg-background/80 backdrop-blur-lg border-t border-border/10">
         <div className="flex gap-3 max-w-lg mx-auto w-full">
           <button type="button" onClick={onClose}
             className="flex-1 h-14 rounded-2xl bg-secondary/50 text-foreground font-black text-[10px] uppercase tracking-[0.2em] transition-all active:scale-95"

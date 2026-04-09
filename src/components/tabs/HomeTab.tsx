@@ -10,7 +10,6 @@ import { AccountQuickButton } from '@/components/AccountQuickButton';
 import { HomeCurrencyRates } from '@/components/widgets/HomeCurrencyRates';
 import { GoalsWidget, LoansWidget, SubscriptionsWidget, PinnedLinksWidget, CategoryInsightsWidget, BudgetsWidget, ConverterWidget, RecentPersonalWidget, RecentSharedWidget } from '@/components/widgets/HomeWidgets';
 import { isProUserCached } from '@/lib/proAccess';
-import { Crown } from 'lucide-react';
 
 interface HomeTabProps {
   onAddPersonal: () => void;
@@ -128,7 +127,13 @@ export function HomeTab({ onAddPersonal, onAddShared, onOpenAccount, onNavigateT
                 backgroundClip: 'text',
               }}
             >{displayName}</h1>
-            {isEffectivePro && <Crown size={14} className="text-amber-400" fill="currentColor" strokeWidth={0} />}
+            {isEffectivePro && (
+              <img
+                src="/assets/pro-verified-gold.png"
+                alt="Pro verified"
+                className="w-4 h-4 object-contain"
+              />
+            )}
           </div>
         </div>
         <AccountQuickButton onClick={onOpenAccount} />
@@ -223,7 +228,7 @@ export function HomeTab({ onAddPersonal, onAddShared, onOpenAccount, onNavigateT
             style={{ background: 'hsl(var(--primary) / 0.12)' }}>
             <Users size={16} className="text-primary" />
           </div>
-          <span className="text-left leading-tight">Add<br />Shared</span>
+          <span className="text-left leading-tight">Add<br />Split</span>
         </button>
       </div>
 

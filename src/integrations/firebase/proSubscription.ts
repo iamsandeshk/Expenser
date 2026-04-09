@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import {
+  deleteDoc,
   Timestamp,
   doc,
   getDoc,
@@ -168,14 +169,8 @@ export async function loadProSubscriptionForCurrentUser(): Promise<ProSubscripti
   return fromSnapshot(snapshot.data(), user.uid);
 }
 
-export function subscribeToProSubscriptionForCurrentUser(callback: (record: ProSubscriptionRecord | null) => void) {
-  const user = getCurrentGoogleUser();
-  if (!user) {
-    callback(null);
-    return () => {};
-  }
-
-  const ref = getSubscriptionRef(user.uid);
+export function subscribeToProSubscriptionForCurrentUser(uid: string, callback: (record: ProSubscriptionRecord | null) => void) {
+  const ref = getSubscriptionRef(uid);
 
   return onSnapshot(ref, (snapshot) => {
     if (!snapshot.exists()) {
@@ -183,7 +178,7 @@ export function subscribeToProSubscriptionForCurrentUser(callback: (record: ProS
       return;
     }
 
-    callback(fromSnapshot(snapshot.data(), user.uid));
+    callback(fromSnapshot(snapshot.data(), uid));
   }, (error) => {
     console.error('Pro subscription listener failed:', error);
   });
@@ -200,5 +195,19 @@ export async function expireProSubscriptionForCurrentUser() {
     await retryOnce(() => withTimeout(setDoc(ref, { isPro: false, isExpired: true }, { merge: true }), 'Pro subscription expire'));
   } catch (error) {
     throw toActionableError(error, 'Pro subscription expire failed.');
+  }
+}
+
+export async function deleteProSubscriptionForCurrentUser() {
+  const user = getCurrentGoogleUser();
+  if (!user) {
+    throw new Error('auth/not-signed-in');
+  }
+
+  const ref = getSubscriptionRef(user.uid);
+  try {
+    await retryOnce(() => withTimeout(deleteDoc(ref), 'Pro subscription delete'));
+  } catch (error) {
+    throw toActionableError(error, 'Pro subscription delete failed.');
   }
 }

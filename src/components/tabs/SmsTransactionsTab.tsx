@@ -1,0 +1,1090 @@
+import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Capacitor } from '@capacitor/core';
+import { ArrowLeft, Check, MessageSquare, Pencil, Send, X } from 'lucide-react';
+import { AccountQuickButton } from '@/components/AccountQuickButton';
+import { NativeAdCard } from '@/components/NativeAdCard';
+import { useToast } from '@/hooks/use-toast';
+import { useBackHandler } from '@/hooks/useBackHandler';
+import { useAdFree } from '@/hooks/useAdFree';
+import { cn } from '@/lib/utils';
+import {
+  generateId,
+  getAccountProfile,
+  getFriendGroups,
+  getPersonalExpenses,
+  getSmsTransactions,
+  getUniquePersonNames,
+  removeSmsTransaction,
+  savePersonalExpense,
+  saveSharedExpense,
+  upsertSmsTransactions,
+  type SmsTargetTab,
+  type SmsTransactionCandidate,
+} from '@/lib/storage';
+import { SmsTransactions } from '@/plugins/SmsTransactionPlugin';
+import { useBannerAd } from '@/hooks/useBannerAd';
+
+interface SmsTransactionsTabProps {
+  onOpenAccount: () => void;
+  onBack?: () => void;
+  bannerAdActive?: boolean;
+}
+
+const SMS_CAPTURE_ENABLED_KEY = 'splitmate_sms_capture_enabled';
+const SMS_AUTO_APPROVE_KEY = 'splitmate_sms_auto_approve_enabled';
+const SMS_LAST_FETCH_TIME_KEY = 'splitmate_sms_last_fetch_time';
+const SMS_DEMO_EMAIL = 'sandeshkullolli4@gmail.com';
+
+type TransactionDirection = 'credit' | 'debit';
+type SmsCategory = 'Food' | 'Transport' | 'Shopping' | 'Utilities' | 'Entertainment' | 'Income' | 'Cash' | 'Transfer' | 'Other';
+
+const CREDIT_KEYWORDS = ['credited', 'received', 'credit'];
+const DEBIT_KEYWORDS = ['debited', 'sent', 'debit', 'paid'];
+
+const CATEGORY_STYLES: Record<SmsCategory, string> = {
+  Food: 'bg-orange-500/10 text-orange-600 border-orange-500/15',
+  Transport: 'bg-sky-500/10 text-sky-600 border-sky-500/15',
+  Shopping: 'bg-pink-500/10 text-pink-600 border-pink-500/15',
+  Utilities: 'bg-amber-500/10 text-amber-700 border-amber-500/15',
+  Entertainment: 'bg-violet-500/10 text-violet-600 border-violet-500/15',
+  Income: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/15',
+  Cash: 'bg-lime-500/10 text-lime-700 border-lime-500/15',
+  Transfer: 'bg-cyan-500/10 text-cyan-600 border-cyan-500/15',
+  Other: 'bg-secondary/60 text-muted-foreground border-border/20',
+};
+
+const CATEGORY_BADGE_LABELS: Record<SmsCategory, string> = {
+  Food: 'Food 🍕',
+  Transport: 'Transport 🚗',
+  Shopping: 'Shopping 🛍️',
+  Utilities: 'Utilities ⚡',
+  Entertainment: 'Entertainment 🎬',
+  Income: 'Income 💼',
+  Cash: 'Cash 💵',
+  Transfer: 'Transfer 💸',
+  Other: 'Other 📋',
+};
+
+const CATEGORY_ORDER: Array<{ category: SmsCategory; keywords: RegExp }> = [
+  { category: 'Food', keywords: /\b(zomato|swiggy|food)\b/i },
+  { category: 'Transport', keywords: /\b(uber|ola|rapido|petrol)\b/i },
+  { category: 'Shopping', keywords: /\b(amazon|flipkart|myntra)\b/i },
+  { category: 'Utilities', keywords: /\b(electricity|gas|water|bill)\b/i },
+  { category: 'Entertainment', keywords: /\b(netflix|spotify|prime)\b/i },
+  { category: 'Income', keywords: /\b(salary|payroll)\b/i },
+  { category: 'Cash', keywords: /\b(atm|cash)\b/i },
+];
+
+const SMART_LABELS: Record<string, string> = {
+  zomato: 'Order 🍔',
+  swiggy: 'Order 🍔',
+  uber: 'Ride 🚗',
+  ola: 'Ride 🚗',
+  amazon: 'Purchase 📦',
+  flipkart: 'Purchase 📦',
+};
+
+const MERCHANT_ICONS: Record<string, string> = {
+  zomato: '🍔',
+  swiggy: '🍔',
+  uber: '🚗',
+  ola: '🚗',
+  rapido: '🛵',
+  amazon: '📦',
+  flipkart: '📦',
+  myntra: '🛍️',
+  netflix: '🎬',
+  spotify: '🎵',
+  paytm: '💳',
+  phonepe: '💳',
+  gpay: '💳',
+  'google pay': '💳',
+  bhim: '💳',
+  cred: '💳',
+};
+
+const formatCurrencyAmount = (amount: number) => new Intl.NumberFormat('en-IN', {
+  maximumFractionDigits: 0,
+}).format(amount);
+
+const normalizeBodyForSignature = (value: string) => value
+  .toLowerCase()
+  .replace(/\s+/g, ' ')
+  .replace(/[^a-z0-9\s]/g, '')
+  .trim();
+
+const buildSmsSignature = (item: { amount: number; sourceAddress: string; date: string; body: string }) => {
+  const source = (item.sourceAddress || '').toLowerCase().replace(/\s+/g, '');
+  const body = normalizeBodyForSignature(item.body || '').slice(0, 64);
+  return `${Math.round(item.amount)}|${source}|${item.date}|${body}`;
+};
+
+const DEMO_SMS_TRANSACTIONS: SmsTransactionCandidate[] = [
+  {
+    id: 'demo-sms-1',
+    externalId: 'demo-sms-1',
+    sourceAddress: 'VK-HDFCBK',
+    body: 'Rs.420 paid to zomato@oksbi via UPI Ref 123456',
+    amount: 420,
+    date: new Date().toISOString().split('T')[0],
+    reason: 'Zomato order via UPI',
+    name: 'HDFCBK',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'demo-sms-2',
+    externalId: 'demo-sms-2',
+    sourceAddress: 'AX-ICICIB',
+    body: 'Rs.850 credited from rahul@ybl via UPI Ref 888100',
+    amount: 850,
+    date: new Date().toISOString().split('T')[0],
+    reason: 'UPI credit from Rahul',
+    name: 'ICICIB',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'demo-sms-3',
+    externalId: 'demo-sms-3',
+    sourceAddress: 'AD-SBIUPI',
+    body: 'Paid Rs.299 to uber@paytm using UPI txn 998812',
+    amount: 299,
+    date: new Date().toISOString().split('T')[0],
+    reason: 'Uber ride payment',
+    name: 'SBIUPI',
+    createdAt: new Date().toISOString(),
+  },
+];
+
+const titleCase = (value: string) => value
+  .split(/\s+/)
+  .filter(Boolean)
+  .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+  .join(' ');
+
+const cleanCounterparty = (value: string): string => {
+  const compact = value.replace(/[^a-zA-Z0-9@._&\-\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!compact) return '';
+
+  const token = compact.replace(/^(from|to|at|via)\s+/i, '').trim();
+  if (!token) return '';
+
+  const upiMatch = token.match(/^([a-z0-9._&-]+)@([a-z0-9._-]+)$/i);
+  if (upiMatch) {
+    const name = upiMatch[1]
+      .replace(/[0-9]+$/, '')
+      .replace(/[._-]+/g, ' ')
+      .trim();
+
+    if (!name) return '';
+    return titleCase(name);
+  }
+
+  const identifier = token.replace(/\s+/g, '');
+  if (/^[A-Z0-9]{6,}$/.test(identifier) && !/[a-z]/.test(identifier)) {
+    return '';
+  }
+
+  const merchantLike = token.replace(/@.*$/, '').trim();
+  if (merchantLike && merchantLike.length <= 2) {
+    return '';
+  }
+
+  return titleCase(merchantLike.replace(/[._-]+/g, ' '));
+};
+
+const PAYMENT_APP_PATTERNS: Array<{ label: string; pattern: RegExp }> = [
+  { label: 'Google Pay', pattern: /\b(gpay|google\s*pay|tez)\b/i },
+  { label: 'PhonePe', pattern: /\b(phonepe)\b/i },
+  { label: 'Paytm', pattern: /\b(paytm)\b/i },
+  { label: 'BHIM UPI', pattern: /\b(bhim)\b/i },
+  { label: 'Amazon Pay', pattern: /\b(amazon\s*pay|amznpay)\b/i },
+  { label: 'WhatsApp Pay', pattern: /\b(whatsapp\s*pay)\b/i },
+  { label: 'CRED', pattern: /\b(cred)\b/i },
+  { label: 'MobiKwik', pattern: /\b(mobikwik|mobi\s*kwik)\b/i },
+  { label: 'YONO', pattern: /\b(yono)\b/i },
+  { label: 'Freecharge', pattern: /\b(freecharge)\b/i },
+  { label: 'UPI', pattern: /\b(upi)\b/i },
+  { label: 'Bank', pattern: /\b(imps|neft|rtgs|bank)\b/i },
+];
+
+const getPaymentAppLabel = (item: SmsTransactionCandidate): string => {
+  const text = [item.body, item.reason, item.name, item.sourceAddress].filter(Boolean).join(' ');
+  for (const entry of PAYMENT_APP_PATTERNS) {
+    if (entry.pattern.test(text)) return entry.label;
+  }
+
+  return 'SMS';
+};
+
+const getMerchantIcon = (counterparty: string, paymentApp: string): string => {
+  const normalizedCounterparty = counterparty.toLowerCase();
+  const matchedMerchant = Object.entries(MERCHANT_ICONS).find(([key]) => normalizedCounterparty.includes(key));
+  if (matchedMerchant) return matchedMerchant[1];
+
+  const normalizedApp = paymentApp.toLowerCase();
+  const matchedApp = Object.entries(MERCHANT_ICONS).find(([key]) => normalizedApp.includes(key));
+  if (matchedApp) return matchedApp[1];
+
+  if (normalizedApp.includes('upi')) return '💸';
+  if (normalizedApp.includes('bank')) return '🏦';
+  return '🧾';
+};
+
+const inferDirection = (text: string): TransactionDirection => {
+  const lowered = text.toLowerCase();
+  const hasCredit = CREDIT_KEYWORDS.some((keyword) => lowered.includes(keyword));
+  const hasDebit = DEBIT_KEYWORDS.some((keyword) => lowered.includes(keyword));
+
+  if (hasCredit && !hasDebit) return 'credit';
+  if (hasDebit && !hasCredit) return 'debit';
+  if (hasCredit) return 'credit';
+  return 'debit';
+};
+
+const extractCounterparty = (item: SmsTransactionCandidate, direction: TransactionDirection): string => {
+  const text = [item.body, item.reason, item.name, item.sourceAddress].filter(Boolean).join(' ');
+
+  const upiHandle = text.match(/\b([a-z0-9._&-]{3,})@([a-z0-9._-]{2,})\b/i);
+  if (upiHandle?.[1]) {
+    const merchant = cleanCounterparty(upiHandle[1]);
+    if (merchant) return merchant;
+  }
+
+  const patterns = direction === 'credit'
+    ? [
+        /(?:received|credited|credit(?:ed)?)\s+(?:from|by)\s+([^,.\n]+?)(?=\s+(?:on|via|using|through|ref|utr|txn|transaction|avl|bal|$))/i,
+        /\bfrom\s+([^,.\n]+?)(?=\s+(?:on|via|using|through|ref|utr|txn|transaction|$))/i,
+      ]
+    : [
+        /(?:sent|paid|debited?|transferred)\s+(?:to|at)\s+([^,.\n]+?)(?=\s+(?:on|via|using|through|ref|utr|txn|transaction|avl|bal|$))/i,
+        /\bto\s+([^,.\n]+?)(?=\s+(?:on|via|using|through|ref|utr|txn|transaction|$))/i,
+      ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (!match?.[1]) continue;
+
+    const candidate = cleanCounterparty(match[1]);
+    if (candidate) return candidate;
+  }
+
+  const merchantVia = text.match(/\bto\s+([A-Za-z\s]{3,})\s+via\b/i);
+  if (merchantVia?.[1]) {
+    const merchant = cleanCounterparty(merchantVia[1]);
+    if (merchant) return merchant;
+  }
+
+  const senderLike = cleanCounterparty(item.name || '');
+  const senderCodeLike = (item.name || '').replace(/[^A-Za-z]/g, '');
+  if (
+    senderLike
+    && !/^(sms|alert|bank|transaction)$/i.test(senderLike)
+    && !(senderCodeLike && /^[A-Z]{5,}$/.test(senderCodeLike))
+  ) {
+    return senderLike;
+  }
+
+  if (/\b(bank|transfer|neft|imps|rtgs)\b/i.test(text)) {
+    return 'Bank Transfer';
+  }
+
+  return 'Unknown';
+};
+
+const getTransactionCategory = (item: SmsTransactionCandidate, counterparty: string): SmsCategory => {
+  const text = [item.body, item.reason, item.name, item.sourceAddress, counterparty].filter(Boolean).join(' ');
+  for (const entry of CATEGORY_ORDER) {
+    if (entry.keywords.test(text)) return entry.category;
+  }
+
+  if (counterparty !== 'Unknown' && counterparty !== 'Bank Transfer') {
+    return 'Transfer';
+  }
+
+  return 'Other';
+};
+
+const getTransactionTitle = (item: SmsTransactionCandidate) => {
+  const text = [item.body, item.reason, item.name, item.sourceAddress].filter(Boolean).join(' ');
+  const direction = inferDirection(text);
+  const counterparty = extractCounterparty(item, direction);
+
+  if (counterparty === 'Unknown') return 'Unknown';
+  if (counterparty === 'Bank Transfer') return 'Bank Transfer';
+
+  const counterpartyKey = counterparty.toLowerCase();
+  const smartEntry = Object.entries(SMART_LABELS).find(([key]) => counterpartyKey.includes(key));
+  if (smartEntry) {
+    return direction === 'credit'
+      ? `From ${counterparty}`
+      : `${counterparty} ${smartEntry[1]}`;
+  }
+
+  return direction === 'credit' ? `From ${counterparty}` : `To ${counterparty}`;
+};
+
+const getEditableTransactionName = (item: SmsTransactionCandidate) => {
+  const title = getTransactionTitle(item);
+  return title.replace(/^(From|To)\s+/i, '');
+};
+
+const getTransactionDisplayMeta = (item: SmsTransactionCandidate) => {
+  const text = [item.body, item.reason, item.name, item.sourceAddress].filter(Boolean).join(' ');
+  const direction = inferDirection(text);
+  const counterparty = extractCounterparty(item, direction);
+  const category = getTransactionCategory(item, counterparty);
+  const paymentApp = getPaymentAppLabel(item);
+  const merchantIcon = getMerchantIcon(counterparty, paymentApp);
+  const amountPrefix = direction === 'credit' ? '+' : '-';
+  const amountClassName = direction === 'credit' ? 'text-green-500' : 'text-red-500';
+
+  return {
+    title: getTransactionTitle(item),
+    category,
+    categoryLabel: CATEGORY_BADGE_LABELS[category],
+    categoryClassName: CATEGORY_STYLES[category],
+    paymentApp,
+    merchantIcon,
+    amountLabel: `${amountPrefix}₹${formatCurrencyAmount(Math.abs(item.amount))}`,
+    amountClassName,
+    direction,
+    counterparty,
+  };
+};
+
+const getAutoApprovedPersonalExpense = (item: SmsTransactionCandidate) => {
+  const text = [item.body, item.reason, item.name, item.sourceAddress].filter(Boolean).join(' ');
+  const direction = inferDirection(text);
+  const counterparty = extractCounterparty(item, direction);
+  const category = direction === 'credit' ? 'Income' : getTransactionCategory(item, counterparty);
+
+  return {
+    reason: getTransactionTitle(item),
+    category,
+    isIncome: direction === 'credit',
+  };
+};
+
+const isDuplicateAutoApprovedPersonal = (
+  item: SmsTransactionCandidate & { timestamp: number },
+  approved: ReturnType<typeof getAutoApprovedPersonalExpense>,
+): boolean => {
+  const existingPersonal = getPersonalExpenses();
+
+  return existingPersonal.some((expense) => {
+    if (expense.source !== 'sms') return false;
+
+    if (expense.smsExternalId && expense.smsExternalId === item.externalId) {
+      return true;
+    }
+
+    const expenseTime = new Date(expense.createdAt || expense.date).getTime();
+    if (!Number.isFinite(expenseTime)) return false;
+
+    const closeInTime = Math.abs(expenseTime - item.timestamp) <= 60_000;
+    const sameAmount = Math.abs(expense.amount - item.amount) < 0.01;
+    const sameDirection = Boolean(expense.isIncome) === approved.isIncome;
+    const sameReason = (expense.reason || '').trim().toLowerCase() === approved.reason.trim().toLowerCase();
+
+    return closeInTime && sameAmount && sameDirection && sameReason;
+  });
+};
+
+const parseLocalDate = (dateValue: string) => {
+  const isoMatch = dateValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  const parsed = new Date(dateValue);
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+};
+
+const formatTransactionDate = (dateValue: string) => {
+  const date = parseLocalDate(dateValue);
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const startOfYesterday = new Date(startOfToday);
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+
+  const startOfTransaction = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  if (startOfTransaction.getTime() === startOfToday.getTime()) return 'Today';
+  if (startOfTransaction.getTime() === startOfYesterday.getTime()) return 'Yesterday';
+
+  return date.toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+};
+
+export function SmsTransactionsTab({ onOpenAccount, onBack, bannerAdActive = true }: SmsTransactionsTabProps) {
+  useBannerAd(bannerAdActive);
+  const { isAdFree } = useAdFree();
+  const { toast } = useToast();
+
+  const [items, setItems] = useState<SmsTransactionCandidate[]>(getSmsTransactions());
+  const [editing, setEditing] = useState<SmsTransactionCandidate | null>(null);
+  const [smsCaptureEnabled, setSmsCaptureEnabled] = useState(() => localStorage.getItem(SMS_CAPTURE_ENABLED_KEY) === 'true');
+  const [smsAutoApproveEnabled, setSmsAutoApproveEnabled] = useState(() => localStorage.getItem(SMS_AUTO_APPROVE_KEY) === 'true');
+  const [targetTab, setTargetTab] = useState<SmsTargetTab>('personal');
+  const [targetPersonName, setTargetPersonName] = useState('');
+  const [targetGroupId, setTargetGroupId] = useState('');
+  const [draftReason, setDraftReason] = useState('');
+  const [draftName, setDraftName] = useState('');
+  const [draftDirection, setDraftDirection] = useState<TransactionDirection>('debit');
+  const [draftAmount, setDraftAmount] = useState('');
+  const [draftDate, setDraftDate] = useState('');
+  const [dismissedDemoIds, setDismissedDemoIds] = useState<string[]>([]);
+
+  const accountEmail = (getAccountProfile().email || '').trim().toLowerCase();
+  const showDemoTransactions = accountEmail === SMS_DEMO_EMAIL;
+
+  const visibleItems = useMemo(() => {
+    if (!showDemoTransactions) return items;
+
+    const demo = DEMO_SMS_TRANSACTIONS.filter((item) => !dismissedDemoIds.includes(item.id));
+    return [...demo, ...items];
+  }, [dismissedDemoIds, items, showDemoTransactions]);
+
+  const groups = useMemo(() => getFriendGroups(), [items.length]);
+  const persons = useMemo(() => getUniquePersonNames().filter((name) => name !== 'me'), [items.length]);
+  useBackHandler(!!editing, () => setEditing(null));
+
+  const refresh = () => setItems(getSmsTransactions());
+
+  const normalizeSmsReason = (body: string): string => {
+    const compact = body.replace(/\s+/g, ' ').trim();
+    if (!compact) return 'SMS Transaction';
+    return compact.length > 60 ? `${compact.slice(0, 60)}...` : compact;
+  };
+
+  const normalizeSmsName = (address: string): string => {
+    const cleaned = address.replace(/[^a-zA-Z0-9]/g, '').trim();
+    if (!cleaned) return 'SMS';
+    return cleaned.length > 24 ? cleaned.slice(0, 24) : cleaned;
+  };
+
+  useEffect(() => {
+    const sync = () => refresh();
+    window.addEventListener('splitmate_sms_transactions_changed', sync);
+
+    return () => {
+      window.removeEventListener('splitmate_sms_transactions_changed', sync);
+    };
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(SMS_CAPTURE_ENABLED_KEY, String(smsCaptureEnabled));
+
+    if (smsCaptureEnabled && !localStorage.getItem(SMS_LAST_FETCH_TIME_KEY)) {
+      // On first enable, start from "now" to avoid importing historical SMS.
+      localStorage.setItem(SMS_LAST_FETCH_TIME_KEY, String(Date.now()));
+    }
+  }, [smsCaptureEnabled]);
+
+  useEffect(() => {
+    localStorage.setItem(SMS_AUTO_APPROVE_KEY, String(smsAutoApproveEnabled));
+  }, [smsAutoApproveEnabled]);
+
+  useEffect(() => {
+    if (!smsCaptureEnabled || !Capacitor.isNativePlatform()) return;
+
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    const pullSmsTransactions = async () => {
+      try {
+        const granted = await SmsTransactions.requestSmsPermissions();
+        if (!granted.granted) return;
+
+        await SmsTransactions.initializeCapture();
+
+        const lastFetchTime = Number(localStorage.getItem(SMS_LAST_FETCH_TIME_KEY) || 0);
+        const result = await SmsTransactions.fetchNewTransactions({ limit: 100 });
+        const existingSmsSignatures = new Set(
+          getSmsTransactions().map((item) => buildSmsSignature(item)),
+        );
+        const batchSignatures = new Set<string>();
+
+        const mappedWithTimestamp = (result.messages || [])
+          .map((msg) => ({
+            id: `sms-${msg.id}`,
+            externalId: `sms-${msg.id}`,
+            sourceAddress: msg.address || 'Unknown',
+            body: msg.body || '',
+            amount: Number(msg.amount || 0),
+            date: new Date(msg.dateMillis || Date.now()).toISOString().split('T')[0],
+            reason: normalizeSmsReason(msg.body || ''),
+            name: normalizeSmsName(msg.address || ''),
+            createdAt: new Date().toISOString(),
+            timestamp: msg.dateMillis || Date.now(),
+          }))
+          .filter((item) => {
+            if (!(item.amount > 0 && item.timestamp > lastFetchTime)) return false;
+
+            const signature = buildSmsSignature(item);
+            if (existingSmsSignatures.has(signature) || batchSignatures.has(signature)) return false;
+
+            batchSignatures.add(signature);
+            return true;
+          });
+
+        const mapped: SmsTransactionCandidate[] = mappedWithTimestamp.map(({ timestamp: _, ...item }) => item);
+
+        if (mapped.length > 0) {
+          const latestTime = Math.max(...mappedWithTimestamp.map((item) => item.timestamp));
+          localStorage.setItem(SMS_LAST_FETCH_TIME_KEY, String(latestTime));
+
+          if (smsAutoApproveEnabled) {
+            mappedWithTimestamp.forEach((item) => {
+              const approved = getAutoApprovedPersonalExpense(item);
+              if (isDuplicateAutoApprovedPersonal(item, approved)) return;
+
+              savePersonalExpense({
+                id: generateId(),
+                amount: item.amount,
+                reason: approved.reason,
+                category: approved.category,
+                date: item.date,
+                createdAt: new Date().toISOString(),
+                isIncome: approved.isIncome,
+                source: 'sms',
+                smsExternalId: item.externalId,
+              });
+            });
+          } else {
+            upsertSmsTransactions(mapped);
+          }
+
+          refresh();
+        }
+      } catch (error) {
+        console.warn('[SMS Tab] SMS capture failed', error);
+      }
+    };
+
+    void pullSmsTransactions();
+    interval = setInterval(() => {
+      void pullSmsTransactions();
+    }, 25000);
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [smsAutoApproveEnabled, smsCaptureEnabled]);
+
+  const openEditor = (item: SmsTransactionCandidate) => {
+    setEditing(item);
+    setDraftReason(item.reason);
+    setDraftName(getEditableTransactionName(item));
+    setDraftDirection(inferDirection([item.body, item.reason, item.name, item.sourceAddress].filter(Boolean).join(' ')));
+    setDraftAmount(String(item.amount));
+    setDraftDate(item.date);
+    setTargetTab(item.targetTab || 'personal');
+    setTargetPersonName(item.targetPersonName || persons[0] || '');
+    setTargetGroupId(item.targetGroupId || groups[0]?.id || '');
+  };
+
+  const discardItem = () => {
+    if (!editing) return;
+
+    if (editing.id.startsWith('demo-sms-')) {
+      setDismissedDemoIds((prev) => (prev.includes(editing.id) ? prev : [...prev, editing.id]));
+      setEditing(null);
+      return;
+    }
+
+    removeSmsTransaction(editing.id);
+    setEditing(null);
+    refresh();
+  };
+
+  const approveItem = () => {
+    if (!editing) return;
+
+    const amount = Number(draftAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast({
+        title: 'Invalid amount',
+        description: 'Enter a valid amount before approving.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const finalReason = draftReason.trim() || draftName.trim() || 'SMS Transaction';
+    const finalDate = draftDate || new Date().toISOString().split('T')[0];
+
+    if (targetTab === 'personal') {
+      savePersonalExpense({
+        id: generateId(),
+        amount,
+        reason: finalReason,
+        category: draftDirection === 'credit' ? 'Income' : 'Other',
+        date: finalDate,
+        createdAt: new Date().toISOString(),
+        isIncome: draftDirection === 'credit',
+        source: 'sms',
+      });
+    }
+
+    if (targetTab === 'split') {
+      if (!targetPersonName) {
+        toast({
+          title: 'Choose person',
+          description: 'Select an existing person to move this transaction.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      saveSharedExpense({
+        id: generateId(),
+        amount,
+        reason: finalReason,
+        paidBy: 'me',
+        forPerson: targetPersonName,
+        personName: targetPersonName,
+        date: finalDate,
+        createdAt: new Date().toISOString(),
+        settled: false,
+        category: draftDirection === 'credit' ? 'Income' : 'Other',
+      });
+    }
+
+    if (targetTab === 'group') {
+      const group = groups.find((item) => item.id === targetGroupId);
+      if (!group) {
+        toast({
+          title: 'Choose group',
+          description: 'Select an existing group to move this transaction.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      saveSharedExpense({
+        id: generateId(),
+        amount,
+        reason: finalReason,
+        paidBy: 'me',
+        forPerson: 'all',
+        personName: group.members.find((member) => member !== 'me') || group.name,
+        date: finalDate,
+        createdAt: new Date().toISOString(),
+        settled: false,
+        category: draftDirection === 'credit' ? 'Income' : 'Other',
+        groupId: group.id,
+        splitParticipants: group.members,
+      });
+    }
+
+    if (editing.id.startsWith('demo-sms-')) {
+      setDismissedDemoIds((prev) => (prev.includes(editing.id) ? prev : [...prev, editing.id]));
+    } else {
+      removeSmsTransaction(editing.id);
+    }
+
+    setEditing(null);
+    refresh();
+    toast({ title: 'Moved', description: 'SMS transaction was moved successfully.' });
+  };
+
+  return (
+    <div className="p-4 pb-40 space-y-5 font-sans">
+      <div className="pt-4 pb-1 flex items-start justify-between gap-3">
+        <div className="flex items-start gap-4">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="w-11 h-11 rounded-2xl flex items-center justify-center mt-1 bg-secondary/80 border border-border/10 active:scale-95 transition-all shadow-sm"
+              aria-label="Back"
+            >
+              <ArrowLeft size={18} strokeWidth={2.5} />
+            </button>
+          )}
+          <div className="space-y-0.5">
+            <h1 className="text-2xl font-bold tracking-tight leading-none">SMS Transactions</h1>
+            <p className="text-[13px] text-muted-foreground font-medium opacity-80 max-w-[300px] leading-tight">
+              Auto-added SMS debits appear here. Review and move each one manually.
+            </p>
+          </div>
+        </div>
+        <AccountQuickButton onClick={onOpenAccount} />
+      </div>
+
+      <div className={cn(
+        'relative overflow-hidden border-b border-border/10 py-3 transition-all duration-200',
+        smsCaptureEnabled ? 'bg-transparent' : 'bg-transparent',
+      )}>
+        <div className="relative flex items-center justify-between gap-2.5">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className={cn(
+              'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border',
+              smsCaptureEnabled
+                ? 'border-emerald-500/10 bg-emerald-500/5 text-emerald-500'
+                : 'border-border/10 bg-background/70 text-muted-foreground',
+            )}>
+              <MessageSquare size={15} strokeWidth={2.2} />
+            </div>
+            <div className="min-w-0">
+              <p className={cn(
+                'text-xs font-medium',
+                smsCaptureEnabled ? 'text-emerald-500' : 'text-muted-foreground',
+              )}>
+                SMS capture
+              </p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground/80 font-medium leading-tight">
+                {smsCaptureEnabled
+                  ? 'On now. SplitMate can fetch and parse SMS transactions automatically.'
+                  : 'Off now. Turn this on to request SMS access and auto-detect transactions.'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            role="switch"
+            aria-checked={smsCaptureEnabled}
+            onClick={() => setSmsCaptureEnabled((value) => !value)}
+            className={cn(
+              'relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border px-1 transition-all duration-200',
+              smsCaptureEnabled
+                ? 'border-emerald-500/25 bg-emerald-500/15'
+                : 'border-border/15 bg-background/70',
+            )}
+          >
+            <span
+              className={cn(
+                'relative z-10 inline-flex h-5 w-5 items-center justify-center rounded-full shadow-sm transition-transform duration-200',
+                smsCaptureEnabled
+                  ? 'translate-x-5 bg-emerald-500'
+                  : 'translate-x-0 bg-muted-foreground/70',
+              )}
+            />
+          </button>
+        </div>
+      </div>
+
+      <div className={cn(
+        'relative overflow-hidden border-b border-border/10 py-3 transition-all duration-200',
+        smsCaptureEnabled
+          ? smsAutoApproveEnabled
+            ? 'bg-transparent'
+            : 'bg-transparent'
+          : 'bg-transparent opacity-70',
+      )}>
+        <div className="relative flex items-center justify-between gap-2.5">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className={cn(
+              'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border',
+              smsCaptureEnabled && smsAutoApproveEnabled
+                ? 'border-primary/10 bg-primary/5 text-primary'
+                : 'border-border/10 bg-background/70 text-muted-foreground',
+            )}>
+              <Check size={15} strokeWidth={2.3} />
+            </div>
+            <div className="min-w-0">
+            <p className={cn(
+              'text-xs font-medium',
+              smsCaptureEnabled && smsAutoApproveEnabled ? 'text-primary' : 'text-muted-foreground',
+            )}>
+              Auto approve transactions
+            </p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground/80 font-medium leading-tight">
+              {smsCaptureEnabled
+                ? 'Send captured SMS entries straight to Personal. Credits are counted as income.'
+                : 'Enable SMS capture first to use auto approval.'}
+            </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            role="switch"
+            aria-checked={smsAutoApproveEnabled}
+            disabled={!smsCaptureEnabled}
+            onClick={() => {
+              if (!smsCaptureEnabled) return;
+              setSmsAutoApproveEnabled((value) => !value);
+            }}
+            className={cn(
+              'relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border px-1 transition-all duration-200',
+              !smsCaptureEnabled
+                ? 'cursor-not-allowed border-border/10 bg-background/40'
+                : smsAutoApproveEnabled
+                  ? 'border-primary/25 bg-primary/12'
+                  : 'border-border/15 bg-background/70',
+            )}
+          >
+            <span
+              className={cn(
+                'relative z-10 inline-flex h-5 w-5 items-center justify-center rounded-full shadow-sm transition-transform duration-200',
+                smsAutoApproveEnabled
+                  ? 'translate-x-5 bg-primary'
+                  : 'translate-x-0 bg-muted-foreground/70',
+              )}
+            />
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-sm flex items-center gap-2">
+            <MessageSquare size={15} className="text-primary" />
+            Pending Transactions
+          </h3>
+          <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
+            {visibleItems.length} pending
+          </span>
+        </div>
+
+        {visibleItems.length === 0 ? (
+          <div className="space-y-1 py-2">
+            <p className="text-sm font-medium text-foreground">No transactions yet</p>
+            <p className="text-xs text-muted-foreground">We&apos;ll automatically detect your SMS payments here.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {visibleItems.map((item, idx) => {
+              const meta = getTransactionDisplayMeta(item);
+
+              return (
+                <div key={item.id} className="flex flex-col gap-2">
+                  <div className="relative overflow-hidden rounded-xl bg-card px-3 py-2.5 shadow-sm transition-all duration-200">
+                    <div className="relative flex items-start gap-2.5">
+                      <div className={cn(
+                        'self-center flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border',
+                        meta.direction === 'credit'
+                          ? 'border-emerald-500/10 bg-emerald-500/5 text-emerald-500'
+                          : 'border-rose-500/10 bg-rose-500/5 text-rose-500',
+                      )}>
+                        {meta.direction === 'credit' ? <Send size={14} strokeWidth={2.2} className="rotate-180" /> : <Send size={14} strokeWidth={2.2} />}
+                      </div>
+
+                      <div className="min-w-0 flex-1 space-y-1.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex items-center gap-1.5">
+                            <span className="text-sm leading-none" aria-hidden="true">{meta.merchantIcon}</span>
+                            <p className="text-[15px] font-medium text-foreground truncate">
+                              {meta.title}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                          <span className="inline-flex items-center rounded-full border border-border/10 bg-background/70 px-2 py-0.5 text-[11px] text-muted-foreground">
+                            {meta.paymentApp}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="relative flex shrink-0 flex-col items-end gap-1 pt-0.5">
+                        <span className={cn('text-[15px] font-semibold tracking-tight tabular-nums', meta.amountClassName)}>
+                          {meta.amountLabel}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-muted-foreground">
+                            {formatTransactionDate(item.date)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => openEditor(item)}
+                            className="grid h-8 w-8 place-items-center rounded-full border border-border/20 bg-transparent text-foreground/70 opacity-70 transition-opacity hover:opacity-100"
+                          >
+                            <Pencil size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {!isAdFree && idx % 5 === 0 && (
+                    <div className="pt-1">
+                      <NativeAdCard />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {editing && createPortal(
+        <div className="fixed inset-0 z-[10003] flex items-end justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setEditing(null)}>
+          <div
+            className="w-full max-w-md bg-card rounded-2xl p-6 pb-8 space-y-4 animate-in slide-in-from-bottom-10 border border-border/10 duration-300 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold tracking-tight">Edit SMS Transaction</h3>
+              <button
+                type="button"
+                onClick={() => setEditing(null)}
+                className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Name</label>
+              <input value={draftName} onChange={(e) => setDraftName(e.target.value)} className="w-full h-11 rounded-2xl bg-secondary/30 border border-border/15 px-4 text-sm font-semibold" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Amount</label>
+                <input type="number" value={draftAmount} onChange={(e) => setDraftAmount(e.target.value)} className="w-full h-11 rounded-2xl bg-secondary/30 border border-border/15 px-4 text-sm font-semibold" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Date</label>
+                <input type="date" value={draftDate} onChange={(e) => setDraftDate(e.target.value)} className="w-full h-11 rounded-2xl bg-secondary/30 border border-border/15 px-4 text-sm font-semibold" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Reason</label>
+              <input value={draftReason} onChange={(e) => setDraftReason(e.target.value)} className="w-full h-11 rounded-2xl bg-secondary/30 border border-border/15 px-4 text-sm font-semibold" />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Type</label>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { id: 'debit', label: 'Debit', tone: 'rose' },
+                  { id: 'credit', label: 'Credit', tone: 'emerald' },
+                ] as Array<{ id: TransactionDirection; label: string; tone: 'rose' | 'emerald' }>).map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setDraftDirection(option.id)}
+                    className={cn(
+                      'h-11 rounded-2xl border text-[10px] font-black uppercase tracking-wider transition-all',
+                      draftDirection === option.id
+                        ? option.tone === 'emerald'
+                          ? 'bg-emerald-500/12 text-emerald-600 border-emerald-500/25 shadow-sm'
+                          : 'bg-rose-500/12 text-rose-500 border-rose-500/25 shadow-sm'
+                        : 'bg-secondary/20 border-border/10 text-muted-foreground',
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Move To</label>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { id: 'personal', label: 'Personal' },
+                  { id: 'split', label: 'Split' },
+                  { id: 'group', label: 'Group' },
+                ] as Array<{ id: SmsTargetTab; label: string }>).map((target) => (
+                  <button
+                    key={target.id}
+                    type="button"
+                    onClick={() => setTargetTab(target.id)}
+                    className={cn(
+                      'h-10 rounded-xl border text-[10px] font-black uppercase tracking-wider',
+                      targetTab === target.id ? 'bg-primary/15 text-primary border-primary/30' : 'bg-secondary/20 border-border/10 text-muted-foreground',
+                    )}
+                  >
+                    {target.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {targetTab === 'split' && (
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">For Person</label>
+                <div className="max-h-48 overflow-y-auto rounded-3xl border border-border/15 bg-secondary/20 p-2 space-y-2">
+                  {persons.length === 0 ? (
+                    <div className="px-4 py-5 text-sm text-muted-foreground text-center">
+                      No people available
+                    </div>
+                  ) : (
+                    persons.map((name) => {
+                      const selected = targetPersonName === name;
+                      const initial = name.trim().charAt(0).toUpperCase() || '?';
+
+                      return (
+                        <button
+                          key={name}
+                          type="button"
+                          onClick={() => setTargetPersonName(name)}
+                          className={cn(
+                            'w-full flex items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-all active:scale-[0.99]',
+                            selected
+                              ? 'border-primary/30 bg-primary/10 shadow-sm'
+                              : 'border-transparent bg-background/40 hover:bg-background/60',
+                          )}
+                        >
+                          <span className={cn(
+                            'flex h-9 w-9 items-center justify-center rounded-2xl text-sm font-black',
+                            selected ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground',
+                          )}>
+                            {initial}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-semibold text-foreground">{name}</span>
+                            <span className="block text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                              {selected ? 'Selected' : 'Tap to choose'}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+
+            {targetTab === 'group' && (
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">For Group</label>
+                <select
+                  value={targetGroupId}
+                  onChange={(e) => setTargetGroupId(e.target.value)}
+                  className="w-full h-11 rounded-2xl bg-secondary/30 border border-border/15 px-4 text-sm font-semibold"
+                >
+                  <option value="">Select group</option>
+                  {groups.map((group) => (
+                    <option key={group.id} value={group.id}>{group.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <button
+                type="button"
+                onClick={discardItem}
+                className="h-11 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 text-[10px] font-black uppercase tracking-wider"
+              >
+                Discard
+              </button>
+              <button
+                type="button"
+                onClick={approveItem}
+                className="h-11 rounded-2xl bg-primary text-white text-[10px] font-black uppercase tracking-wider inline-flex items-center justify-center gap-2"
+              >
+                <Check size={14} />
+                Approve
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+
+    </div>
+  );
+}

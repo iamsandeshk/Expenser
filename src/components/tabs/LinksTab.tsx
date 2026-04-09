@@ -1,15 +1,17 @@
 
 import { useState, useEffect, useMemo } from 'react';
-import { ArrowLeft, Plus, Search, Folder, ExternalLink, Pin, X, Bookmark, Globe, LayoutGrid, List } from 'lucide-react';
-import { getLinks, getGroups, LinkItem, LinkGroup } from '@/lib/storage';
+import { ArrowLeft, Plus, Search, Folder, ExternalLink, Pin, X, Bookmark, Globe, LayoutGrid, List, Lock } from 'lucide-react';
+import { getLinks, getGroups, LinkItem, LinkGroup, FREE_LIMITS } from '@/lib/storage';
 import { AddLinkModal } from '@/components/modals/AddLinkModal';
 import { AddGroupModal } from '@/components/modals/AddGroupModal';
 import { LinkCard } from '@/components/LinkCard';
 import { GroupCard } from '@/components/GroupCard';
 import { GroupModal } from '@/components/modals/GroupModal';
 import { AccountQuickButton } from '@/components/AccountQuickButton';
-import { NativeAdCard } from '@/components/NativeAdCard';
 import { useBannerAd } from '@/hooks/useBannerAd';
+import { useProGate } from '@/hooks/useProGate';
+import { requestProUpgrade } from '@/lib/proAccess';
+import { cn } from '@/lib/utils';
 
 interface LinksTabProps {
   onOpenAccount: () => void;
@@ -19,6 +21,7 @@ interface LinksTabProps {
 
 export const LinksTab = ({ onOpenAccount, onBack, bannerAdActive = true }: LinksTabProps) => {
   useBannerAd(bannerAdActive);
+  const { isPro } = useProGate();
   const [links, setLinks] = useState<LinkItem[]>([]);
   const [groups, setGroups] = useState<LinkGroup[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -152,14 +155,32 @@ export const LinksTab = ({ onOpenAccount, onBack, bannerAdActive = true }: Links
             <span className="text-muted-foreground/50 ml-auto text-[10px] font-medium normal-case tracking-normal">{allGroups.length}</span>
           </h3>
           <div className="grid grid-cols-2 gap-4">
-            {allGroups.map((group) => (
-              <GroupCard
-                key={group.id}
-                group={group}
-                onClick={() => setSelectedGroup(group)}
-                onRefresh={loadData}
-              />
-            ))}
+            {allGroups.map((group, index) => {
+              const isLockedGroup = !isPro && index >= FREE_LIMITS.MAX_LINK_GROUPS;
+              return (
+                <div key={group.id} className="relative">
+                  <div className={cn(isLockedGroup && 'opacity-40 pointer-events-none')}>
+                    <GroupCard
+                      group={group}
+                      onClick={() => setSelectedGroup(group)}
+                      onRefresh={loadData}
+                    />
+                  </div>
+                  {isLockedGroup && (
+                    <button
+                      type="button"
+                      onClick={() => requestProUpgrade('link-groups', 'Free users can use 1 link group. Upgrade to Pro for unlimited groups.')}
+                      className="absolute inset-0 z-10"
+                      aria-label="Upgrade to unlock this group"
+                    >
+                      <span className="absolute top-2 right-2 w-7 h-7 rounded-lg bg-black/55 border border-white/20 flex items-center justify-center">
+                        <Lock size={12} className="text-white" />
+                      </span>
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -204,16 +225,34 @@ export const LinksTab = ({ onOpenAccount, onBack, bannerAdActive = true }: Links
             </div>
           </div>
           <div className={linkViewMode === 'grid' ? 'grid grid-cols-2 gap-3' : 'flex flex-col gap-2'}>
-            {allLinks.map((link, idx) => (
-              <div key={link.id} className="contents">
-                <LinkCard
-                  link={link}
-                  onRefresh={loadData}
-                  viewMode={linkViewMode}
-                />
-                {idx === 0 && <NativeAdCard variant={linkViewMode === 'grid' ? 'grid' : 'list'} />}
-              </div>
-            ))}
+            {allLinks.map((link, idx) => {
+              const isLockedLink = !isPro && idx >= FREE_LIMITS.MAX_LINKS;
+              return (
+                <div key={link.id} className="contents">
+                  <div className="relative">
+                    <div className={cn(isLockedLink && 'opacity-40 pointer-events-none')}>
+                      <LinkCard
+                        link={link}
+                        onRefresh={loadData}
+                        viewMode={linkViewMode}
+                      />
+                    </div>
+                    {isLockedLink && (
+                      <button
+                        type="button"
+                        onClick={() => requestProUpgrade('links', 'Free users can save up to 4 links. Upgrade to Pro for unlimited links.')}
+                        className="absolute inset-0 z-10"
+                        aria-label="Upgrade to unlock this link"
+                      >
+                        <span className="absolute top-2 right-2 w-7 h-7 rounded-lg bg-black/55 border border-white/20 flex items-center justify-center">
+                          <Lock size={12} className="text-white" />
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

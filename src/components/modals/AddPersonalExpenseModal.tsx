@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { savePersonalExpense, generateId, EXPENSE_CATEGORIES, getCurrency, getSuggestedReasons, type PersonalExpense } from '@/lib/storage';
+import { savePersonalExpense, generateId, EXPENSE_CATEGORIES, getAccounts, getCurrency, getSuggestedReasons, type PersonalExpense } from '@/lib/storage';
 import { Receipt, Tag, CalendarDays, ChevronLeft, ArrowRight, Save, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -34,6 +34,8 @@ export function AddPersonalExpenseModal({ isOpen, onClose, onAdd }: AddPersonalE
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isIncome, setIsIncome] = useState(false);
+  const [accountId, setAccountId] = useState('');
+  const accounts = useMemo(() => getAccounts(), [isOpen]);
 
   const suggestions = useMemo(() => getSuggestedReasons('personal', isIncome), [isOpen, isIncome]);
 
@@ -44,6 +46,7 @@ export function AddPersonalExpenseModal({ isOpen, onClose, onAdd }: AddPersonalE
       setCategory(EXPENSE_CATEGORIES[0]);
       setDate(new Date().toISOString().split('T')[0]);
       setIsIncome(false);
+      setAccountId(getAccounts()[0]?.id || '');
     }
   }, [isOpen]);
   
@@ -64,6 +67,7 @@ export function AddPersonalExpenseModal({ isOpen, onClose, onAdd }: AddPersonalE
       category: isIncome ? "Income" : category,
       date,
       createdAt: new Date().toISOString(),
+      accountId: accountId || undefined,
       isIncome
     };
     
@@ -154,6 +158,33 @@ export function AddPersonalExpenseModal({ isOpen, onClose, onAdd }: AddPersonalE
               </button>
             </div>
 
+            {accounts.length > 0 && (
+              <div className="space-y-3">
+                <label className="block text-[10px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] px-1">
+                  {isIncome ? 'Credited To Account' : 'Paid From Account'}
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {accounts.map((account) => (
+                    <button
+                      key={account.id}
+                      type="button"
+                      onClick={() => setAccountId(account.id)}
+                      className={cn(
+                        'px-5 py-3 rounded-[1.1rem] border text-[12px] font-black uppercase tracking-wider transition-all',
+                        accountId === account.id
+                          ? isIncome
+                            ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-500'
+                            : 'bg-primary/15 border-primary/30 text-primary'
+                          : 'bg-secondary/30 border-border/10 text-muted-foreground/60',
+                      )}
+                    >
+                      {account.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Reason */}
             <div className="space-y-3">
               <label className="block text-[10px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] px-1">
@@ -166,7 +197,8 @@ export function AddPersonalExpenseModal({ isOpen, onClose, onAdd }: AddPersonalE
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   placeholder={isIncome ? "Where did this come from?" : "What was this for?"}
-                  className="w-full h-14 pl-12 pr-6 rounded-[1.5rem] text-[14px] font-bold bg-secondary/30 border border-border/10 focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-[10px] placeholder:font-black placeholder:tracking-widest placeholder:text-muted-foreground/60"
+                  className="w-full h-14 pl-12 pr-6 rounded-[1.75rem] text-[14px] font-bold bg-secondary/30 border focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-[10px] placeholder:font-black placeholder:tracking-widest placeholder:text-muted-foreground/60"
+                  style={{ borderColor: 'hsl(var(--foreground) / 0.14)' }}
                 />
               </div>
 
@@ -267,7 +299,7 @@ export function AddPersonalExpenseModal({ isOpen, onClose, onAdd }: AddPersonalE
               ) : (
                 <>
                   <Save size={18} />
-                  {isIncome ? 'Save Income' : 'Log Expense'}
+                  {isIncome ? 'Save Income' : 'Add Expense'}
                 </>
               )}
             </button>
