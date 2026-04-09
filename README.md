@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+=======
+
+>>>>>>> 8ca6ae36fb9f55c9fb59014f0a9370cdaa9c8942
 # SplitMate
 
 SplitMate is a personal and shared expense tracker built with React, TypeScript, Vite, Tailwind, and Capacitor.
@@ -136,3 +140,7 @@ Demo rows are visible in the SMS Transactions list only and are dismissible by a
 - build:dev: development-mode build
 - preview: preview built app
 - lint: run ESLint
+<<<<<<< HEAD
+=======
+
+>>>>>>> 8ca6ae36fb9f55c9fb59014f0a9370cdaa9c8942
